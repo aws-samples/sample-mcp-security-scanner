@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "security-scanner": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "PATH_TO_THE_CLONED_REPOSITORY",
+        "security_scanner_mcp_server"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "scan_with_checkov",
+        "scan_with_semgrep", 
+        "scan_with_bandit",
+        "get_supported_formats"
+      ]
+    }
+  }
+}
