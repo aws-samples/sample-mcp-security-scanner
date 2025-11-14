@@ -72,18 +72,34 @@ This MCP server enables AI assistants to perform comprehensive security analysis
 
 ### Local Installation
 
-This MCP server is not available via PyPI and requires local download for enhanced security and control:
+This MCP server is not available via PyPI for enhanced security and control:
 
 - **Security**: Verify the exact code you're running by inspecting the repository
 - **Control**: Pin to specific versions and review changes before updating
 - **Performance**: Local caching improves startup speed and reduces network dependencies
 - **Trust**: Avoid potential package name confusion or use of unsecure mcp servers
 
-1. **Clone or download the repository:**
+You can install this server using one of two methods:
+
+#### Option 1: Install from Local Path
+
+Clone or download the repository locally:
+
 ```bash
 git clone git@github.com:aws-samples/sample-mcp-security-scanner.git
 cd sample-mcp-security-scanner
 ```
+
+Then configure your MCP client to use the local path (see configuration examples below).
+
+#### Option 2: Install from GitHub
+
+Configure your MCP client to install directly from GitHub using:
+```
+git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main
+```
+
+This method automatically downloads and installs the server without requiring a local clone (see configuration examples below).
  
 ### Dependencies
 The server automatically installs:
@@ -98,7 +114,7 @@ The server automatically installs:
 
 ### MCP Configuration
 
-After downloading the repository locally, configure your MCP client to use the server. The configuration varies by client.
+Configure your MCP client to use the server. The configuration varies by client and supports both local path and GitHub installation methods.
 
 ### Getting Started with Kiro
 
@@ -109,7 +125,11 @@ See [Kiro Model Context Protocol Documentation](https://kiro.dev/docs/mcp/config
 
 1. Navigate `Kiro` > `MCP Servers`
 2. Add a new MCP server by clicking the `Open MCP Config` button.
-3. Paste the configuration below, replacing `/path/to/sample-mcp-security-scanner` with your actual repository path:
+3. Paste one of the configurations below:
+
+#### Option 1: Install from Local Path
+
+Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
 
 #### `.kiro/settings/mcp.json` (local) or `~/.kiro/settings/mcp.json` (global)
 
@@ -133,6 +153,28 @@ See [Kiro Model Context Protocol Documentation](https://kiro.dev/docs/mcp/config
 }
 ```
 
+#### Option 2: Install from GitHub
+
+```json
+{
+  "mcpServers": {
+    "security-scanner": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main",
+        "security_scanner_mcp_server"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
 </details>
 
 ### Getting Started with Amazon Q Developer
@@ -144,7 +186,11 @@ See [Amazon Q Developer documentation](https://docs.aws.amazon.com/amazonq/lates
 
 1. **Manual Configuration**
    - Edit the MCP configuration file at `~/.aws/amazonq/mcp.json` (global) or `.amazonq/mcp.json` (local).
-   - Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
+   - Use one of the configurations below:
+
+#### Option 1: Install from Local Path
+
+Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
 
 #### `~/.aws/amazonq/mcp.json`
 
@@ -166,6 +212,26 @@ See [Amazon Q Developer documentation](https://docs.aws.amazon.com/amazonq/lates
 }
 ```
 
+#### Option 2: Install from GitHub
+
+```json
+{
+  "mcpServers": {
+    "security-scanner": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main",
+        "security_scanner_mcp_server"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    }
+  }
+}
+```
+
 </details>
 
 ### Getting Started with Cline
@@ -176,7 +242,11 @@ See [Amazon Q Developer documentation](https://docs.aws.amazon.com/amazonq/lates
 1. Install the [Cline VS Code Extension](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev).
 2. Click the extension to open it and select **MCP Servers**.
 3. Select the **Installed** tab, then click **Configure MCP Servers** to open the `cline_mcp_settings.json` file.
-4. Add the configuration below, replacing `/path/to/sample-mcp-security-scanner` with your actual repository path:
+4. Add one of the configurations below:
+
+#### Option 1: Install from Local Path
+
+Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
 
 #### `cline_mcp_settings.json`
 
@@ -188,6 +258,28 @@ See [Amazon Q Developer documentation](https://docs.aws.amazon.com/amazonq/lates
       "args": [
         "--from",
         "/path/to/sample-mcp-security-scanner",
+        "security_scanner_mcp_server"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+#### Option 2: Install from GitHub
+
+```json
+{
+  "mcpServers": {
+    "security-scanner": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main",
         "security_scanner_mcp_server"
       ],
       "env": {
@@ -327,6 +419,10 @@ MIT License - see LICENSE file for details.
 ## Contributing
 
 Contributions welcome! Please read CONTRIBUTING.md for guidelines.
+
+## Authors
+
+Pattern created by Ivan Girardi (AWS) and Iker Reina Fuente (AWS).
 
 ## Security
 
