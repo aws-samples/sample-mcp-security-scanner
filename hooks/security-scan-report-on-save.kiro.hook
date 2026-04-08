@@ -1,0 +1,35 @@
+{
+  "enabled": true,
+  "name": "Security Scanner Report",
+  "description": "Automatically scans files for security vulnerabilities and issues when they are saved, checking for common security problems like hardcoded secrets, SQL injection risks, insecure configurations, and other security best practices violations",
+  "version": "1",
+    "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "*.py",
+      "*.js",
+      "*.ts",
+      "*.java",
+      "*.go",
+      "*.c",
+      "*.cpp",
+      "*.cs",
+      "*.rb",
+      "*.php",
+      "*.scala",
+      "*.kt",
+      "*.rs",
+      "*.tf",
+      "*.tfvars",
+      "*.yaml",
+      "*.yml",
+      "*.json",
+      "*.bicep",
+      "Dockerfile*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Scan ALL currently open editor files for security vulnerabilities (not just the active file). Read each open file and scan it using the appropriate MCP security scanner tool:\n\n- For Python files (.py): Use mcp_security_scanner_scan_with_bandit\n- For source code files (.py, .js, .ts, .java, .go, .c, .cpp, .cs, .rb, .php, .scala, .kt, .rs): Use mcp_security_scanner_scan_with_semgrep\n- For Infrastructure as Code files (.tf, .tfvars, .yaml, .yml, .json, Dockerfile, .bicep): Use mcp_security_scanner_scan_with_checkov\n\nScan ALL open editor files, not just the active one. Report any security issues found with severity levels and remediation recommendations for each file.\n- NEVER modify the source code.\n- NEVER provide links in the output.\n- ALWAYS reuse current session and NEVER create a new chat session."
+  }
+}

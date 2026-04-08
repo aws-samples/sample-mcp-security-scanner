@@ -1,0 +1,35 @@
+{
+  "enabled": true,
+  "name": "Security Scanner",
+  "description": "Automatically scans files for security vulnerabilities and issues when they are saved, checking for common security problems like hardcoded secrets, SQL injection risks, insecure configurations, and other security best practices violations",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "*.py",
+      "*.js",
+      "*.ts",
+      "*.java",
+      "*.go",
+      "*.c",
+      "*.cpp",
+      "*.cs",
+      "*.rb",
+      "*.php",
+      "*.scala",
+      "*.kt",
+      "*.rs",
+      "*.tf",
+      "*.tfvars",
+      "*.yaml",
+      "*.yml",
+      "*.json",
+      "*.bicep",
+      "Dockerfile*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Scan the modified file for security vulnerabilities using the appropriate MCP security scanner tool, then remediate the findings but ask approval before chaning the files:\n\n1. INITIAL SCAN PHASE:\n   - For Python files (.py): Use mcp_security_scanner_scan_with_bandit\n   - For source code files (.py, .js, .ts, .java, .go, .c, .cpp, .cs, .rb, .php, .scala, .kt, .rs): Use mcp_security_scanner_scan_with_semgrep\n   - For Infrastructure as Code files (.tf, .tfvars, .yaml, .yml, .json, Dockerfile, .bicep): Use mcp_security_scanner_scan_with_checkov\n   - Record all findings with severity levels and issue counts\n\n2. REMEDIATION PHASE:\n   - If security issues are found, fix them by:\n     * Replacing insecure functions with secure alternatives\n     * Removing hardcoded secrets and replacing with environment variables or placeholders\n     * Adding proper input validation and sanitization\n     * Fixing SQL injection vulnerabilities with parameterized queries\n     * Updating insecure configurations to follow security best practices\n     * Adding proper error handling and logging\n   - Apply fixes using strReplace to update the code\n   - Verify fixes don't break functionality using getDiagnostics\n   - ALWAS ask approval before changing the files\n\n3. FINAL SCAN PHASE (MANDATORY):\n   - ALWAYS perform a complete rescan of the entire file using the same security scanner tool\n   - Read the updated file content and scan it again\n   - Record all remaining findings with severity levels and issue counts\n   - Compare initial vs final scan results to measure improvement\n\n4. SUMMARY REPORT (MANDATORY):\n   - Create a structured summary report containing:\n     * File scanned and scanner tool used\n     * Initial scan results: Total issues found by severity (CRITICAL, HIGH, MEDIUM, LOW)\n     * Remediation actions: List of fixes applied with brief descriptions\n     * Final scan results: Total remaining issues by severity\n     * Improvement metrics: Number and percentage of issues resolved\n     * Remaining issues: List any unresolved issues requiring manual intervention\n   - Present the report in a clear, readable format"
+  }
+}

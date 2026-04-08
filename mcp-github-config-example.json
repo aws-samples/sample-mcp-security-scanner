@@ -8,14 +8,26 @@
         "security_scanner_mcp_server"
       ],
       "env": {
-        "FASTMCP_LOG_LEVEL": "ERROR"
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "WORKSPACE_ROOT": "PATH_TO_YOUR_WORKSPACE (optional, defaults to current working directory)"
       },
       "disabled": false,
       "autoApprove": [
         "scan_with_checkov",
         "scan_with_semgrep", 
         "scan_with_bandit",
-        "get_supported_formats"
+        "scan_with_ash",
+        "scan_with_trivy",
+        "scan_image_with_trivy",
+        "scan_directory_with_grype",
+        "scan_directory_with_checkov",
+        "scan_directory_with_bandit",
+        "scan_directory_with_semgrep",
+        "scan_directory_with_ash",
+        "scan_directory_with_syft",
+        "check_ash_availability",
+        "get_supported_formats",
+        "generate_security_report"
       ]
     }
   }

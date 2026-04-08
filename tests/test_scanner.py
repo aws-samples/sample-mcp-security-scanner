@@ -5,10 +5,10 @@ import asyncio
 import sys
 import os
 
-# Add the server module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../security_scanner_mcp_server'))
+# Add the project root to path so the package can be imported properly
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from server import scanner
+from security_scanner_mcp_server.server import scanner
 
 async def test_checkov():
     """Test Checkov scanning with Terraform code."""
