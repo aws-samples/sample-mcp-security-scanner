@@ -193,6 +193,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }
@@ -216,6 +217,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }
@@ -255,7 +257,8 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
-      }
+      },
+      "timeout": 120000
     }
   }
 }
@@ -276,7 +279,8 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
-      }
+      },
+      "timeout": 120000
     }
   }
 }
@@ -314,6 +318,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }
@@ -337,6 +342,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }

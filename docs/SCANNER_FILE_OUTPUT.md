@@ -353,6 +353,7 @@ Optionally set the `WORKSPACE_ROOT` environment variable in your MCP configurati
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }
