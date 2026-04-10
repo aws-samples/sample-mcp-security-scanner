@@ -30,6 +30,7 @@ Add to your MCP configuration file:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "PATH_TO_YOUR_WORKSPACE (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": [
         "scan_with_checkov",

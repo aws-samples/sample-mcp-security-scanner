@@ -57,6 +57,7 @@
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
+      "timeout": 120000,
       "disabled": false
     }
   },

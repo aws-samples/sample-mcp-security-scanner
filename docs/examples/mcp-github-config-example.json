@@ -4,13 +4,14 @@
       "command": "uvx",
       "args": [
         "--from",
-        "PATH_TO_THE_CLONED_REPOSITORY",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main",
         "security_scanner_mcp_server"
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "PATH_TO_YOUR_WORKSPACE (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": [
         "scan_with_checkov",

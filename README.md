@@ -77,7 +77,7 @@ This MCP server enables AI assistants to perform comprehensive security analysis
 - Returns lightweight summaries with file paths
 - Optional `return_output=True` parameter to get full results instead
 - Timestamped files for tracking scan history
-- See [SCANNER_FILE_OUTPUT.md](SCANNER_FILE_OUTPUT.md) for details
+- See [SCANNER_FILE_OUTPUT.md](docs/SCANNER_FILE_OUTPUT.md) for details
 
 ## Installation
 
@@ -193,6 +193,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }
@@ -216,6 +217,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }
@@ -255,7 +257,8 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
-      }
+      },
+      "timeout": 120000
     }
   }
 }
@@ -276,7 +279,8 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
-      }
+      },
+      "timeout": 120000
     }
   }
 }
@@ -314,6 +318,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }
@@ -337,6 +342,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
       },
+      "timeout": 120000,
       "disabled": false,
       "autoApprove": []
     }
@@ -624,7 +630,7 @@ Scan a container image for vulnerabilities.
 
 **Output:** Saves to `.trivy/trivy_scan_{image}_{timestamp}.json` and returns summary
 
-**Note:** All directory scanning tools automatically save full results to dedicated folders and return lightweight summaries. Use `return_output=True` to get full results in the response instead. See [SCANNER_FILE_OUTPUT.md](SCANNER_FILE_OUTPUT.md) for more details.
+**Note:** All directory scanning tools automatically save full results to dedicated folders and return lightweight summaries. Use `return_output=True` to get full results in the response instead. See [SCANNER_FILE_OUTPUT.md](docs/SCANNER_FILE_OUTPUT.md) for more details.
 
 ## Supported Formats
 
@@ -703,12 +709,17 @@ This repository is also packaged as a [Kiro Power](https://kiro.dev/docs/powers/
 ### What's included
 
 ```
-power/
-├── POWER.md                          # Power metadata and documentation
+sample-mcp-security-scanner/
+├── POWER.md                          # Power metadata and documentation (repo root)
 ├── mcp.json                          # Pre-configured MCP server (auto-approve all tools)
-└── steering/
-    ├── scanning-workflows.md         # Auto-included: scanner selection, scan-fix-rescan loop, report generation
-    └── secure-coding.md              # Auto-included: application, infrastructure, and dependency security rules
+├── steering/
+│   ├── scanning-workflows.md         # Auto-included: scanner selection, scan-fix-rescan loop, report generation
+│   └── secure-coding.md              # Auto-included: application, infrastructure, and dependency security rules
+├── security_scanner_mcp_server/      # MCP server source code
+├── agents/                           # Pre-built Kiro agent configs
+├── hooks/                            # Kiro hook definitions
+├── tests/                            # Test suite
+└── docs/                             # Documentation, examples, and assets
 ```
 
 ### How it works
