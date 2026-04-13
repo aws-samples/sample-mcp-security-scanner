@@ -624,6 +624,7 @@ class SecurityScanner:
                         log_level=AshLogLevel.ERROR,  # Keep it quiet
                         fail_on_findings=False,  # Don't exit on findings
                         show_summary=False,  # Don't show summary
+                        progress=False,  # Disable Rich Live display — blocks when no TTY (MCP server context)
                         exclude_scanners=['semgrep'],  # Exclude semgrep to avoid duplication
                     )
                     
@@ -1891,6 +1892,7 @@ class SecurityScanner:
                         log_level=AshLogLevel.ERROR,
                         fail_on_findings=False,
                         show_summary=False,
+                        progress=False,  # Disable Rich Live display — blocks when no TTY (MCP server context)
                         exclude_scanners=['semgrep'],  # Exclude semgrep to avoid duplication
                     )
                     
