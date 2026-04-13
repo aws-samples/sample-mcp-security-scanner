@@ -5,7 +5,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@feat-security-report-stride-coverage",
         "security_scanner_mcp_server"
       ],
       "env": {

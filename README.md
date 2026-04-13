@@ -114,7 +114,7 @@ Then configure your MCP client to use the local path (see configuration examples
 
 Configure your MCP client to install directly from GitHub using:
 ```
-git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main
+git+https://github.com/aws-samples/sample-mcp-security-scanner.git@feat-security-report-stride-coverage
 ```
 
 This method automatically downloads and installs the server without requiring a local clone (see configuration examples below).
@@ -210,7 +210,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@feat-security-report-stride-coverage",
         "security_scanner_mcp_server"
       ],
       "env": {
@@ -273,7 +273,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@feat-security-report-stride-coverage",
         "security_scanner_mcp_server"
       ],
       "env": {
@@ -335,7 +335,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@main",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git@feat-security-report-stride-coverage",
         "security_scanner_mcp_server"
       ],
       "env": {
