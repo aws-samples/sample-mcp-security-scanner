@@ -53,7 +53,91 @@ The power provides a single MCP server with multiple scanning tools:
 | `check_ash_availability` | Check ASH installation status |
 | `generate_security_report` | Generate SECURITY.md from scan results |
 
-## Scanning Strategy
+## Agent Behavior Rules
+
+These rules apply whenever this power is active, regardless of the user's workspace.
+
+### ASH is opt-in
+
+Do NOT run `scan_with_ash` or `scan_directory_with_ash` by default. Only use ASH when the user explicitly asks for it or requests a "comprehensive scan". When relevant, inform the user: "ASH is also available for multi-tool aggregated scanning — let me know if you'd like to include it."
+
+### Check for `.security/config.yaml` before scanning or reporting
+
+Before running a full project scan OR generating a SECURITY.md report, check if `.security/config.yaml` exists in the project root:
+
+- **If it exists**: proceed — the tool loads it automatically.
+- **If it does NOT exist**: ask the user before proceeding:
+  > "I don't see a `.security/config.yaml` in this project. This file lets you define project assumptions (e.g., 'authentication is handled by Cognito with MFA') and document resolved findings — both appear in the SECURITY.md report and help with threat modeling. Would you like me to: 1) Create a template you can fill in, or 2) Skip it and continue with only auto-generated assumptions?"
+  - Option 1: create the file using the template below, then proceed.
+  - Option 2: proceed immediately.
+
+Template for `.security/config.yaml`:
+```yaml
+# Project Security Context — loaded automatically by generate_security_report
+project:
+  name: <project-name>
+  description: <brief project description>
+
+# STRIDE categories: Spoofing | Tampering | Repudiation |
+#   Information Disclosure | Denial of Service | Elevation of Privilege
+assumptions:
+  # - assumption: <What you assume to be true>
+  #   linked_threats: <STRIDE category>
+  #   comments: <Evidence or context>
+
+resolved_findings:
+  # - id: <Finding ID from scanner>
+  #   tool: <scanner name>
+  #   severity: <HIGH, MEDIUM, LOW>
+  #   action: <What was done to fix it>
+```
+
+### Full project scan workflow
+
+When the user asks to scan the whole project or generate a report:
+
+1. Check for `.security/config.yaml` (see above)
+2. Run `check_ash_availability` to see which tools are installed — inform the user of any gaps
+3. Run applicable directory scanners with `return_output=True`:
+   - `scan_directory_with_semgrep` — always
+   - `scan_directory_with_bandit` — always
+   - `scan_directory_with_checkov` — always
+   - `scan_directory_with_grype` — if installed
+   - `scan_directory_with_syft` — if installed
+   - `scan_image_with_trivy` — if Dockerfiles or images present
+   - `scan_directory_with_ash` — only if user explicitly requests it
+4. Collect all results and call `generate_security_report`
+5. Save the returned `report` field as `SECURITY.md`
+
+### Scan-fix-rescan loop
+
+When asked to fix security issues:
+1. Scan the file with the appropriate tool
+2. Fix issues by severity order: CRITICAL → HIGH → MEDIUM → LOW
+3. Re-scan to verify fixes
+4. Repeat until clean or only accepted risks remain
+5. Summarize what was fixed and what remains
+
+### Severity handling
+
+- **CRITICAL**: Must fix before deployment
+- **HIGH**: Fix in current sprint
+- **MEDIUM**: Triage and plan for next sprint
+- **LOW**: Backlog — review for risk acceptance
+
+### Secure coding principles (apply proactively when generating code)
+
+- Validate and sanitize all external inputs
+- Use parameterized queries — never string concatenation for SQL/NoSQL
+- Never hardcode secrets, passwords, or API keys
+- Use cryptographically secure random generators
+- Use strong hashing (SHA-256+, bcrypt, argon2) — never MD5/SHA-1 for security
+- Avoid dangerous functions: `eval()`, `exec()`, `pickle.loads()`, `yaml.load()` without SafeLoader
+- Use subprocess with explicit argument lists and `shell=False`
+- Containers: run as non-root, read-only root filesystem, drop all capabilities
+- IAM: least-privilege policies, no wildcard (`*`) actions or resources
+
+
 
 Use the right scanner for the job:
 
