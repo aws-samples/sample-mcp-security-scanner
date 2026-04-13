@@ -98,16 +98,17 @@ When the user asks to scan the whole project or generate a report:
 
 1. Check for `.security/config.yaml` (see above)
 2. Run `check_ash_availability` to see which tools are installed — inform the user of any gaps
-3. Run applicable directory scanners with `return_output=True`. Always pass the absolute path to the project (use `pwd` or equivalent to get it — never pass `.` or a relative path, as the MCP server process cannot resolve relative paths reliably):
-   - `scan_directory_with_semgrep` — always
-   - `scan_directory_with_bandit` — always
-   - `scan_directory_with_checkov` — always
+3. Get the absolute project path first using `pwd` or equivalent — never pass `.` or a relative path
+4. Run directory scanners **sequentially** (not in parallel) with `return_output=True` to avoid context overflow. Run only the scanners that are installed:
+   - `scan_directory_with_semgrep`
+   - `scan_directory_with_bandit`
+   - `scan_directory_with_checkov`
    - `scan_directory_with_grype` — if installed
    - `scan_directory_with_syft` — if installed
    - `scan_image_with_trivy` — if Dockerfiles or images present
    - `scan_directory_with_ash` — only if user explicitly requests it
-4. Collect all results and call `generate_security_report`
-5. Save the returned `report` field as `SECURITY.md`
+5. Collect all results and call `generate_security_report`
+6. Save the returned `report` field as `SECURITY.md`
 
 ### Scan-fix-rescan loop
 
