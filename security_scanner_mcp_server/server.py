@@ -20,6 +20,40 @@ warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
 from .report_generator import register_report_tool
 
 
+def _expand_path() -> None:
+    """Expand PATH by sourcing the user's shell profile.
+
+    When the MCP server is launched via uvx, it inherits a minimal PATH that
+    often excludes tool managers like mise, pyenv, homebrew, etc. This function
+    asks the login shell to print its PATH and merges it into os.environ so that
+    tools like checkov, semgrep, bandit, grype, trivy are discoverable via shutil.which.
+    """
+    try:
+        shell = os.environ.get('SHELL', '/bin/bash')
+        result = subprocess.run(
+            [shell, '-l', '-c', 'echo $PATH'],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            shell_path = result.stdout.strip()
+            current_path = os.environ.get('PATH', '')
+            # Merge: shell path first so user tools take precedence
+            merged = shell_path
+            for p in current_path.split(':'):
+                if p and p not in merged.split(':'):
+                    merged += ':' + p
+            os.environ['PATH'] = merged
+            logger.debug(f"Expanded PATH from login shell: {merged[:200]}...")
+    except Exception as e:
+        logger.debug(f"Could not expand PATH from login shell: {e}")
+
+
+# Expand PATH at import time so all shutil.which() calls see the full environment
+_expand_path()
+
+
 def resolve_directory_path(directory_path: str) -> Path:
     """Resolve a directory path using WORKSPACE_ROOT or the path itself if absolute.
 
