@@ -2322,45 +2322,26 @@ class SecurityScanner:
                     
                     # If save_sbom is True, save to file
                     if save_sbom:
-                        from datetime import datetime
-                        from pathlib import Path
-                        import os
-                        
-                        # Create .sbom directory in workspace root
-                        workspace_root = os.environ.get('WORKSPACE_ROOT', os.getcwd())
-                        sbom_dir = Path(workspace_root) / '.sbom'
-                        sbom_dir.mkdir(exist_ok=True)
-                        
-                        # Generate filename with timestamp
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                        dir_name = Path(directory_path).name
-                        
-                        # Determine file extension based on format
-                        format_extensions = {
-                            'json': 'json',
-                            'cyclonedx-json': 'cyclonedx.json',
-                            'spdx-json': 'spdx.json',
-                            'table': 'txt'
-                        }
-                        extension = format_extensions.get(output_format, 'json')
-                        output_file = sbom_dir / f'sbom_{dir_name}_{timestamp}.{extension}'
-                        
-                        # Save output to file
-                        output_file.write_text(result.stdout)
-                        logger.info(f"SBOM saved to: {output_file}")
-                        
-                        # Return summary with file path
+                        file_info = self._save_scan_output('sbom', directory_path, result.stdout, 'json')
                         summary = self._format_syft_summary(syft_results)
                         return {
                             'success': True,
-                            'sbom_file': str(output_file),
                             'output_format': output_format,
                             'scanned_directory': directory_path,
+                            **file_info,
                             **summary
                         }
                     else:
-                        # Return only summary, no file saved
-                        return self._format_syft_results(syft_results)
+                        # Always save to file and return lean summary — never return full package list inline
+                        file_info = self._save_scan_output('sbom', directory_path, result.stdout, 'json')
+                        summary = self._format_syft_summary(syft_results)
+                        return {
+                            'success': True,
+                            'output_format': output_format,
+                            'scanned_directory': directory_path,
+                            **file_info,
+                            **summary
+                        }
                         
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse Syft JSON output: {e}")
@@ -2375,28 +2356,27 @@ class SecurityScanner:
                     from pathlib import Path
                     import os
                     
-                    workspace_root = os.environ.get('WORKSPACE_ROOT', os.getcwd())
-                    sbom_dir = Path(workspace_root) / '.sbom'
+                    base_dir = Path(os.environ.get('WORKSPACE_ROOT', directory_path))
+                    sbom_dir = base_dir / '.sbom'
                     sbom_dir.mkdir(exist_ok=True)
                     
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     dir_name = Path(directory_path).name
                     output_file = sbom_dir / f'sbom_{dir_name}_{timestamp}.txt'
-                    
                     output_file.write_text(result.stdout)
                     logger.info(f"SBOM saved to: {output_file}")
                     
                     return {
                         'success': True,
-                        'sbom_file': str(output_file),
+                        'output_file': str(output_file),
                         'output_format': output_format,
                         'scanned_directory': directory_path
                     }
                 else:
                     return {
                         'success': True,
-                        'output': result.stdout[:1000],  # Return first 1000 chars
-                        'note': 'Full output not saved. Set save_sbom=True to save to file.'
+                        'output': result.stdout[:500],
+                        'note': 'Set save_sbom=True to save full SBOM to file.'
                     }
             
         except subprocess.TimeoutExpired:
