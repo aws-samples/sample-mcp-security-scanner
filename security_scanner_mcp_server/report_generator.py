@@ -715,9 +715,19 @@ def register_report_tool(mcp, handle_exceptions):
     async def generate_security_report(
         project_name: str = Field(description='Name of the project being analyzed'),
         scan_results: str = Field(
+            default='[]',
             description='JSON string with scan results from scan_with_checkov, '
             'scan_with_semgrep, scan_with_bandit, or any other scanning tool. '
-            'Can be a single result object or an array of result objects.'
+            'Can be a single result object or an array of result objects. '
+            'Use scan_result_files instead for large directory scans to avoid context overflow.'
+        ),
+        scan_result_files: str = Field(
+            default='[]',
+            description='JSON array of file paths to scan result JSON files saved by directory '
+            'scanners (e.g. [".bandit/bandit_scan_....json", ".semgrep/semgrep_scan_....json"]). '
+            'The tool reads these files server-side — use this instead of scan_results for '
+            'directory scans to avoid passing large JSON through the context window. '
+            'Paths can be absolute or relative to WORKSPACE_ROOT.'
         ),
         resolved_findings: str = Field(
             default='[]',
@@ -743,13 +753,44 @@ def register_report_tool(mcp, handle_exceptions):
         This report does not replace a formal security assessment by a
         qualified Security Architect.
         """
+        import os
+        from pathlib import Path
+
+        # Load results from files (preferred for directory scans — avoids context overflow)
+        file_results = []
         try:
-            results = json.loads(scan_results)
+            file_paths = json.loads(scan_result_files) if scan_result_files else []
+        except json.JSONDecodeError:
+            file_paths = []
+
+        workspace_root = os.environ.get('WORKSPACE_ROOT', '')
+        for fp in file_paths:
+            p = Path(fp)
+            if not p.is_absolute() and workspace_root:
+                p = Path(workspace_root) / fp
+            try:
+                with open(p, 'r') as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    file_results.extend(data)
+                else:
+                    file_results.append(data)
+            except Exception as e:
+                logger.warning(f"Could not read scan result file {fp}: {e}")
+
+        # Load inline results
+        try:
+            inline_results = json.loads(scan_results) if scan_results and scan_results != '[]' else []
         except json.JSONDecodeError:
             return {"success": False, "error": "Invalid JSON in scan_results"}
 
-        if isinstance(results, dict):
-            results = [results]
+        if isinstance(inline_results, dict):
+            inline_results = [inline_results]
+
+        results = file_results + inline_results
+
+        if not results:
+            return {"success": False, "error": "No scan results provided. Pass scan_results (inline JSON) or scan_result_files (list of file paths)."}
 
         try:
             resolved = json.loads(resolved_findings) if resolved_findings else []
