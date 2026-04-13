@@ -23,8 +23,8 @@ resource "aws_s3_bucket" "test" {
             with open(file_path, 'w') as f:
                 f.write(terraform_code)
             
-            cmd = f"checkov -f {file_path} --output json --quiet"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            cmd = ["checkov", "-f", file_path, "--output", "json", "--quiet"]
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.stdout:
                 try:
@@ -59,8 +59,8 @@ def unsafe_function(data):
             with open(file_path, 'w') as f:
                 f.write(python_code)
             
-            cmd = f"semgrep --config=auto --json --quiet {file_path}"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            cmd = ["semgrep", "--config=auto", "--json", "--quiet", file_path]
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.stdout:
                 try:
@@ -96,8 +96,8 @@ def unsafe_function(data):
             with open(file_path, 'w') as f:
                 f.write(python_code)
             
-            cmd = f"bandit -f json {file_path}"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            cmd = ["bandit", "-f", "json", file_path]
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.stdout:
                 try:

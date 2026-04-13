@@ -540,21 +540,33 @@ Generate a SECURITY.md report from scan results.
 **Parameters:**
 - `project_name` (string): Name of the project being analyzed
 - `scan_results` (string): JSON string with scan results from any scanning tool. Can be a single result object or an array of result objects.
+- `resolved_findings` (string, optional): JSON array of resolved findings with fields: `id`, `tool`, `severity`, `action`, `before`, `after`.
+- `assumptions` (string, optional): JSON array of project assumptions. Each item can be a string or an object with `assumption`, `linked_threats`, `comments`.
+
+**Project Security Context (`.security/config.yaml`):**
+
+The tool automatically loads project context from `.security/config.yaml` if it exists. This file can define project metadata, assumptions, and resolved findings — no need to pass them as parameters each time. See [Project Security Context](#project-security-context) for details.
 
 **Workflow:**
-1. Scan relevant files using the appropriate scanner tools
-2. Collect all scan result JSON objects into an array
-3. Call `generate_security_report` with `project_name` and `scan_results` (JSON string)
-4. Save the returned `report` field as `SECURITY.md`
+1. (Optional) Create `.security/config.yaml` with project assumptions and resolved findings
+2. Scan relevant files using the appropriate scanner tools
+3. Collect all scan result JSON objects into an array
+4. Call `generate_security_report` with `project_name` and `scan_results` (JSON string)
+5. Save the returned `report` field as `SECURITY.md`
 
 **Report includes:**
-- Executive Summary — risk level (CRITICAL/HIGH/MEDIUM/LOW) and total finding counts
-- Scan Results — breakdown by scanner, format, and severity
-- Critical & High Severity Findings — detailed per-finding info
-- Medium & Low Severity Findings — summary table
-- Threat Model Inputs — STRIDE classification
-- Compliance & Regulatory Notes — SOC2, PCI-DSS, HIPAA, GDPR observations
-- Recommendations — prioritized actions by severity tier
+- Executive Summary — risk level and severity breakdown
+- Security Assessment Coverage — areas scanned, gaps identified
+- STRIDE Classification — findings classified by threat category with collapsible details
+- Risk Matrix — severity × STRIDE category for prioritization
+- Impacted Assets — assets inferred from findings
+- Assumptions — project assumptions (from `.security/config.yaml`) + auto-generated
+- Scan Results by Tool — per-scanner breakdown with clickable links
+- Resolved Findings — remediated issues with evidence
+- Compliance Considerations — SOC2, PCI-DSS, HIPAA, GDPR, NIST 800-53
+- Recommended Actions — prioritized in three tiers (Immediate/Short-term/Long-term)
+
+> ⚠️ The report includes a disclaimer noting it is a supporting input for threat modeling and security reviews, not a replacement for a formal security assessment.
 
 ### Directory Scanning Tools
 
@@ -712,9 +724,12 @@ This repository is also packaged as a [Kiro Power](https://kiro.dev/docs/powers/
 sample-mcp-security-scanner/
 ├── POWER.md                          # Power metadata and documentation (repo root)
 ├── mcp.json                          # Pre-configured MCP server (auto-approve all tools)
+├── .security/
+│   └── config.yaml                   # Project security context (assumptions, resolved findings)
 ├── steering/
-│   ├── scanning-workflows.md         # Auto-included: scanner selection, scan-fix-rescan loop, report generation
-│   └── secure-coding.md              # Auto-included: application, infrastructure, and dependency security rules
+│   ├── scanning-workflows.md         # Auto-included: scanner selection, scan-fix-rescan loop
+│   ├── secure-coding.md              # Auto-included: application, infrastructure, and dependency security rules
+│   └── security-report.md            # Auto-included: report generation and .security/config.yaml usage
 ├── security_scanner_mcp_server/      # MCP server source code
 ├── agents/                           # Pre-built Kiro agent configs
 ├── hooks/                            # Kiro hook definitions
@@ -727,6 +742,7 @@ sample-mcp-security-scanner/
 - **`mcp.json`** — Pre-configured MCP server definition with all scanning tools auto-approved. Kiro automatically starts the security scanner server when the power is installed.
 - **`scanning-workflows.md`** (auto-included steering) — Guides Kiro to pick the right scanner for each file type, run scan-fix-rescan loops, and generate SECURITY.md reports.
 - **`secure-coding.md`** (auto-included steering) — Instructs Kiro to proactively apply secure coding practices when generating or reviewing code (input validation, parameterized queries, no hardcoded secrets, strong crypto, least-privilege IAM, etc.).
+- **`security-report.md`** (auto-included steering) — Guides Kiro on using `.security/config.yaml` for project assumptions and resolved findings when generating reports.
 
 ### Installing the power
 
@@ -751,6 +767,43 @@ Once installed, Kiro automatically applies the steering rules in every conversat
 
 Kiro will automatically select the right scanner based on file type, apply secure coding practices, and follow the scan-fix-rescan workflow.
 
+## Project Security Context
+
+Projects can define security context in `.security/config.yaml` at the repo root. This file is automatically loaded by `generate_security_report` — no need to pass assumptions or resolved findings as parameters each time.
+
+```yaml
+# .security/config.yaml
+project:
+  name: my-project
+  description: Brief project description
+
+assumptions:
+  - assumption: User authentication is handled by Amazon Cognito with MFA
+    linked_threats: Spoofing
+    comments: Cognito user pool in us-east-1
+
+  - assumption: All data in transit encrypted via TLS 1.2+
+    linked_threats: Information Disclosure, Tampering
+    comments: ALB and API Gateway enforce HTTPS
+
+resolved_findings:
+  - id: B501
+    tool: bandit
+    severity: HIGH
+    action: Changed verify=False to verify=True
+    before: "requests.get(url, verify=False)"
+    after: "requests.get(url, verify=True)"
+```
+
+The file supports three sections:
+- **`project`** — name and description (used in report header)
+- **`assumptions`** — security assumptions with STRIDE links and comments (appear in the Assumptions section of the report)
+- **`resolved_findings`** — remediated findings with before/after evidence (appear in the Resolved Findings section)
+
+Assumptions can also be passed as a parameter to `generate_security_report` for one-off additions — they are appended after the file-based ones.
+
+See the included [`.security/config.yaml`](.security/config.yaml) for a complete template with examples.
+
 ## Kiro Agent: Sec-Lazio
 
 This repository includes a pre-built [Kiro](https://kiro.dev) agent that uses the MCP Security Scanner to provide security-first coding assistance.
@@ -759,9 +812,9 @@ This repository includes a pre-built [Kiro](https://kiro.dev) agent that uses th
 |---------|-------------|
 | Auto-scan | Scans every code change with Semgrep, Bandit, or Checkov |
 | Fix loop | Finds vulnerabilities → fixes them → re-scans until clean |
-| SECURITY.md | Generates structured reports with STRIDE threat model |
+| SECURITY.md | Generates structured reports with STRIDE classification, risk matrix, and coverage analysis |
 | Secure by default | Applies security best practices when generating code |
-| Compliance hints | Flags SOC2, PCI-DSS, HIPAA, GDPR relevant patterns |
+| Compliance hints | Flags SOC2, PCI-DSS, HIPAA, GDPR, NIST 800-53 relevant patterns |
 
 ### Quick install
 

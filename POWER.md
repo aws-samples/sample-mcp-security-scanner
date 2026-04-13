@@ -1,20 +1,20 @@
 ---
 name: "security-scanner"
 displayName: "Security Scanner"
-description: "Scan code and infrastructure for security vulnerabilities with Semgrep, Bandit, Checkov, Trivy, Grype, and ASH — generate SECURITY.md reports with STRIDE threat model inputs and compliance notes"
+description: "Scan code and infrastructure for security vulnerabilities with Semgrep, Bandit, Checkov, Trivy, Grype, and ASH — generate SECURITY.md reports with STRIDE classification, risk matrix, and security assessment coverage"
 keywords: ["security", "scan", "vulnerability", "sast", "iac", "semgrep", "bandit", "checkov", "trivy", "grype", "ash", "stride", "threat-model", "compliance", "owasp", "cwe", "devsecops"]
 author: "AWS Samples"
 ---
 
 # Security Scanner Power
 
-Comprehensive security scanning for source code and Infrastructure as Code, with automated SECURITY.md report generation including STRIDE threat model inputs and compliance notes.
+Comprehensive security scanning for source code and Infrastructure as Code, with automated SECURITY.md report generation including STRIDE classification, risk matrix, security assessment coverage, and compliance notes.
 
 ## Overview
 
 This power integrates six industry-standard security scanners into Kiro, enabling real-time vulnerability detection as you write code. It covers source code (Python, JavaScript, TypeScript, Java, Go, Rust, and more), IaC (Terraform, CloudFormation, Kubernetes, Dockerfile), container images, and dependency manifests.
 
-It also generates structured SECURITY.md reports via the `generate_security_report` tool, which aggregates scan results into an executive summary, detailed findings, STRIDE threat model inputs, compliance notes, and prioritized recommendations.
+It also generates structured SECURITY.md reports via the `generate_security_report` tool, which aggregates scan results into an executive summary, STRIDE classification, risk matrix, impacted assets, assumptions, and prioritized recommendations. The report is designed as input for threat modeling and security reviews.
 
 All scanning runs locally — no code leaves your machine.
 
@@ -24,7 +24,8 @@ All scanning runs locally — no code leaves your machine.
 - Scan IaC files for misconfigurations and compliance violations
 - Scan container images for known CVEs
 - Generate Software Bill of Materials (SBOM)
-- Produce SECURITY.md reports with STRIDE classification and compliance notes
+- Produce SECURITY.md reports with STRIDE classification, risk matrix, and coverage analysis
+- Project security context via `.security/config.yaml` (assumptions, resolved findings)
 - Delta scanning for code changes (minimal overhead)
 - Directory scanning with file-based output to avoid context window overflow
 
@@ -69,23 +70,52 @@ Use the right scanner for the job:
 
 ## Security Report (SECURITY.md)
 
-The `generate_security_report` tool takes scan results JSON and produces a structured report with:
+The `generate_security_report` tool takes scan results JSON and produces a structured security posture document designed as input for threat modeling and security reviews:
 
-1. **Executive Summary** — risk level (CRITICAL/HIGH/MEDIUM/LOW) and total finding counts
-2. **Scan Results** — breakdown by scanner, format, and severity
-3. **Critical & High Severity Findings** — detailed per-finding info (ID, severity, scanner, line, description, resource, guideline)
-4. **Medium & Low Severity Findings** — summary table
-5. **Threat Model Inputs** — STRIDE classification (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege) with applicability based on finding keywords
-6. **Compliance & Regulatory Notes** — reminder to review against SOC2, PCI-DSS, HIPAA, GDPR
-7. **Recommendations** — prioritized actions by severity tier
-8. **Tool Information** — links to MCP Security Scanner and AWS Prescriptive Guidance pattern
+1. **Executive Summary** — risk level (CRITICAL/HIGH/MEDIUM/LOW), total findings, severity breakdown
+2. **Security Assessment Coverage** — areas scanned, assets under review, gaps identified
+3. **STRIDE Classification** — findings classified by threat category (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege) with collapsible details
+4. **Risk Matrix** — severity × STRIDE category for prioritization
+5. **Impacted Assets** — assets inferred from findings with related finding IDs
+6. **Assumptions** — project assumptions (from `.security/config.yaml`) + auto-generated assumptions based on scan coverage
+7. **Scan Results by Tool** — per-scanner breakdown with clickable anchor links
+8. **Resolved Findings** — remediated issues with evidence (from `.security/config.yaml` or parameter)
+9. **Compliance Considerations** — SOC2, PCI-DSS, HIPAA, GDPR, NIST 800-53
+10. **Recommended Actions** — prioritized in three tiers (Immediate/Short-term/Long-term)
+11. **References** — links to MCP Security Scanner, AWS Prescriptive Guidance, AWS threat modeling blog, and Threat Composer
+
+The report includes a disclaimer noting it is a supporting input for threat modeling and security reviews, not a replacement for a formal security assessment.
+
+### Project Security Context
+
+Projects can define assumptions and resolved findings in `.security/config.yaml`:
+
+```yaml
+project:
+  name: my-project
+  description: Brief description
+
+assumptions:
+  - assumption: Authentication handled by Amazon Cognito with MFA
+    linked_threats: Spoofing
+    comments: User pool in us-east-1
+
+resolved_findings:
+  - id: B501
+    tool: bandit
+    severity: HIGH
+    action: Changed verify=False to verify=True
+```
+
+This file is loaded automatically — no need to pass parameters. See the included `.security/config.yaml` for a complete template.
 
 ### Generating a Report
 
-1. Scan relevant files using the appropriate scanner tools
-2. Collect all scan result JSON objects into an array
-3. Call `generate_security_report` with `project_name` and `scan_results` (JSON string)
-4. Save the returned `report` field as `SECURITY.md`
+1. (Optional) Create `.security/config.yaml` with project assumptions
+2. Scan relevant files using the appropriate scanner tools
+3. Collect all scan result JSON objects into an array
+4. Call `generate_security_report` with `project_name` and `scan_results` (JSON string)
+5. Save the returned `report` field as `SECURITY.md`
 
 ## Workflow Examples
 
@@ -139,3 +169,5 @@ Use `return_output=True` parameter to get full results inline instead.
 
 - [MCP Security Scanner on GitHub](https://github.com/aws-samples/sample-mcp-security-scanner)
 - [AWS Prescriptive Guidance Pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/deploy-real-time-coding-security-validation-by-using-an-mcp-server-with-kiro-and-other-coding-assistants.html)
+- [How to approach threat modeling — AWS Security Blog](https://aws.amazon.com/blogs/security/how-to-approach-threat-modeling/)
+- [Threat Composer — AWS threat modeling tool](https://github.com/awslabs/threat-composer)

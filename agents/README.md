@@ -14,9 +14,9 @@ A security-first coding agent that scans code as you write it, enforces secure p
 |---------|-------------|
 | 🔍 Auto-scan | Scans every code change with Semgrep, Bandit, or Checkov |
 | 🔄 Fix loop | Finds vulnerabilities → fixes them → re-scans until clean |
-| 📝 SECURITY.md | Generates structured reports with STRIDE threat model |
+| 📝 SECURITY.md | Generates structured reports with STRIDE classification, risk matrix, and coverage analysis |
 | 🏗️ Secure by default | Applies security best practices when generating code |
-| 📋 Compliance hints | Flags SOC2, PCI-DSS, HIPAA, GDPR relevant patterns |
+| 📋 Compliance hints | Flags SOC2, PCI-DSS, HIPAA, GDPR, NIST 800-53 relevant patterns |
 
 ## Installation
 

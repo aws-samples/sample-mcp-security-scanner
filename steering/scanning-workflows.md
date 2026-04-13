@@ -4,9 +4,41 @@ inclusion: auto
 
 # Security Scanning Workflows
 
-## Scanner Selection
+## Available Tools
 
-Always pick the right tool for the file type:
+All tools provided by the MCP Security Scanner:
+
+### Snippet scanners (scan code passed as string)
+
+| Tool | What it scans | When to use |
+|------|--------------|-------------|
+| `scan_with_bandit` | Python code | Always for .py files |
+| `scan_with_semgrep` | 13+ languages (Python, JS, TS, Java, Go, Rust, etc.) | Always for source code |
+| `scan_with_checkov` | IaC (Terraform, CloudFormation, K8s, Dockerfile, etc.) | Always for IaC files |
+| `scan_with_trivy` | Dockerfile and IaC | Dockerfile and IaC security |
+| `scan_with_ash` | Any file type via multi-tool scanning | Comprehensive scan of a single file |
+| `scan_image_with_trivy` | Container images (e.g., nginx:latest) | When a Dockerfile or image reference is present |
+
+### Directory scanners (scan entire directories)
+
+| Tool | What it scans | When to use |
+|------|--------------|-------------|
+| `scan_directory_with_semgrep` | Source code in 13+ languages | Full project source code scan |
+| `scan_directory_with_bandit` | All Python files | Full project Python scan |
+| `scan_directory_with_checkov` | All IaC files | Full project IaC scan |
+| `scan_directory_with_grype` | Dependency manifests (package.json, requirements.txt, go.mod, etc.) | Dependency vulnerability scan |
+| `scan_directory_with_ash` | All file types via multi-tool scanning | Comprehensive project scan |
+| `scan_directory_with_syft` | All dependency files | Generate Software Bill of Materials (SBOM) |
+
+### Utility tools
+
+| Tool | Purpose |
+|------|---------|
+| `check_ash_availability` | Verify which scanners are installed before scanning |
+| `get_supported_formats` | List all supported languages and IaC formats |
+| `generate_security_report` | Generate SECURITY.md from scan results |
+
+## Scanner Selection by File Type
 
 | File Type | Primary Scanner | Secondary Scanner |
 |-----------|----------------|-------------------|
@@ -22,6 +54,52 @@ Always pick the right tool for the file type:
 
 For Python files, run both Bandit and Semgrep — they catch different classes of issues.
 
+## Generating SECURITY.md Reports
+
+When the user asks to generate a SECURITY.md report, determine the scope first.
+
+### Single file report
+
+If the user asks to scan a specific file or the active file:
+
+1. Read the file content
+2. Identify the file type and select the appropriate scanner(s) from the table above
+3. Run the scanner(s) — for Python, run both `scan_with_bandit` AND `scan_with_semgrep`
+4. For Dockerfiles, also run `scan_with_trivy`
+5. Collect all scan result JSON objects into an array
+6. Call `generate_security_report` with `project_name` and `scan_results`
+7. Save the returned `report` field as `SECURITY.md`
+
+### Full project / directory report
+
+If the user asks to scan the whole project, a directory, or just says "generate a security report":
+
+1. First, run `check_ash_availability` to see which scanners are installed. This tells you which tools will work and which will fail. Inform the user of any missing tools before proceeding.
+2. Run ALL applicable directory scanners with `return_output=True`. Skip tools that are not installed (per step 1):
+   - `scan_directory_with_semgrep` — always (covers 13+ languages) [Python dependency]
+   - `scan_directory_with_bandit` — always (Python-specific deep analysis) [Python dependency]
+   - `scan_directory_with_checkov` — always (catches IaC issues) [Python dependency]
+   - `scan_directory_with_grype` — always (dependency vulnerabilities) [requires separate install: `brew install grype`]
+   - `scan_directory_with_syft` — always (software inventory) [requires separate install: `brew install syft`]
+   - `scan_directory_with_ash` — if user asks for comprehensive scan [Python dependency]
+   - `scan_image_with_trivy` — if Dockerfiles or images present [requires separate install: `brew install trivy`]
+3. Collect all successful scan result JSON objects into an array (skip failed/unavailable tools)
+4. Call `generate_security_report` with `project_name` and the combined results
+5. Save the returned `report` field as `SECURITY.md`
+6. If any tools were unavailable, note this in the response — the report's Security Assessment Coverage section will show them as GAPs automatically
+
+### What `generate_security_report` needs
+
+The tool requires:
+- `project_name` (string) — name of the project
+- `scan_results` (string) — JSON string with an array of scan result objects
+
+It automatically loads `.security/config.yaml` for assumptions and resolved findings.
+
+Optional parameters (only if the user provides them in chat):
+- `assumptions` — JSON array of additional assumptions
+- `resolved_findings` — JSON array of additional resolved findings
+
 ## Scan-Fix-Rescan Loop
 
 When asked to fix security issues:
@@ -33,18 +111,6 @@ When asked to fix security issues:
 5. Repeat until clean or only accepted risks remain
 6. Summarize what was fixed and what remains
 
-## Generating SECURITY.md Reports
-
-When generating a security report:
-
-1. Scan all relevant files using the appropriate scanners
-2. Collect all scan result JSON objects into an array
-3. Call `generate_security_report` with the project name and the JSON array as a string
-4. The tool returns a `report` field containing the full Markdown content
-5. Save it as SECURITY.md in the project root
-
-The report includes: executive summary, findings by severity, STRIDE threat model inputs, compliance notes (SOC2, PCI-DSS, HIPAA, GDPR), prioritized recommendations, and tool information with links.
-
 ## Severity Handling
 
 - **CRITICAL**: Must be fixed before deployment — block the release
@@ -52,6 +118,18 @@ The report includes: executive summary, findings by severity, STRIDE threat mode
 - **MEDIUM**: Triage and plan — fix in the next sprint or accept with justification
 - **LOW**: Backlog — review for risk acceptance or opportunistic fix
 
-## Directory Scanning
+## Directory Scanning Output
 
-For full-project scans, use `scan_directory_with_*` tools. These save results to dedicated output folders (`.semgrep/`, `.bandit/`, `.checkov/`, `.grype/`, `.ash/`, `.trivy/`, `.sbom/`) to avoid flooding the context window. Use `return_output=True` only when you need the full results inline.
+Directory scanning tools save results to dedicated output folders by default to prevent context window overflow:
+
+| Tool | Output Directory |
+|------|-----------------|
+| Semgrep | `.semgrep/` |
+| Bandit | `.bandit/` |
+| Checkov | `.checkov/` |
+| Grype | `.grype/` |
+| ASH | `.ash/` |
+| Trivy | `.trivy/` |
+| Syft | `.sbom/` |
+
+Use `return_output=True` when you need the full results inline (required for report generation).

@@ -23,39 +23,66 @@ from .report_generator import register_report_tool
 mcp = FastMCP(
     'security_scanner_mcp_server',
     instructions="""
-    Security Scanner MCP Server provides tools to perform security analysis on code using industry-standard tools.
-    
-    This server enables you to:
-    - Scan Infrastructure as Code (IaC) files using Checkov
-    - Analyze source code for security vulnerabilities using Semgrep
-    - Detect security issues in Python code using Bandit
-    - Perform comprehensive multi-tool security scans using ASH (Automated Security Helper)
-    
-    Supported formats and languages:
-    
-    Checkov (IaC Security):
-    - Terraform (.tf, .tfvars)
-    - CloudFormation (.yaml, .yml, .json)
-    - Kubernetes (.yaml, .yml)
-    - Dockerfile
-    - ARM templates (.json)
-    - Bicep (.bicep)
-    - And many more IaC formats
-    
-    Semgrep (Source Code Security):
-    - Python, JavaScript, TypeScript, Java, Go, C/C++
-    - C#, Ruby, PHP, Scala, Kotlin, Rust
-    
-    Bandit (Python Security):
-    - Python (.py) files only
-    
-    ASH (Automated Security Helper):
-    - Comprehensive security scanning with multiple tools
-    - Supports all of the above plus: cfn-nag, cdk-nag, detect-secrets, grype, syft, npm-audit
-    - Can scan code deltas or full directories
-    - Provides aggregated results from multiple scanners
-    
-    All tools (except ASH full directory scans) analyze only the provided code snippet, not entire projects.
+    Security Scanner MCP Server — real-time security analysis using industry-standard tools.
+
+    TOOLS OVERVIEW:
+
+    Snippet scanners (scan code passed as string):
+    - scan_with_bandit: Python security (always use for .py files)
+    - scan_with_semgrep: 13+ languages (Python, JS, TS, Java, Go, Rust, C#, etc.)
+    - scan_with_checkov: IaC (Terraform, CloudFormation, K8s, Dockerfile, ARM, Bicep, etc.)
+    - scan_with_trivy: Dockerfile and IaC security
+    - scan_with_ash: Comprehensive multi-tool scan for any file type
+    - scan_image_with_trivy: Container image vulnerability scanning
+
+    Directory scanners (scan entire directories, use return_output=True for report generation):
+    - scan_directory_with_semgrep: Source code across 13+ languages
+    - scan_directory_with_bandit: All Python files
+    - scan_directory_with_checkov: All IaC files
+    - scan_directory_with_grype: Dependency vulnerabilities (package.json, requirements.txt, etc.)
+    - scan_directory_with_ash: Comprehensive multi-tool directory scan
+    - scan_directory_with_syft: Software Bill of Materials (SBOM) generation
+
+    Utility tools:
+    - check_ash_availability: Verify which scanners are installed
+    - get_supported_formats: List supported languages and IaC formats
+    - generate_security_report: Generate SECURITY.md from scan results
+
+    SCANNER SELECTION BY FILE TYPE:
+    - Python (.py): scan_with_bandit + scan_with_semgrep (use both)
+    - JavaScript/TypeScript (.js, .ts): scan_with_semgrep
+    - Java, Go, Rust, Kotlin, C#: scan_with_semgrep
+    - Terraform (.tf): scan_with_checkov
+    - CloudFormation (.yaml, .json): scan_with_checkov
+    - Kubernetes manifests: scan_with_checkov
+    - Dockerfile: scan_with_checkov + scan_with_trivy
+    - Container images: scan_image_with_trivy
+    - Dependencies: scan_directory_with_grype
+
+    GENERATING SECURITY.md REPORTS:
+
+    For a single file:
+    1. Read the file, identify type, run appropriate scanner(s)
+    2. Collect results into a JSON array
+    3. Call generate_security_report with project_name and scan_results
+
+    For a full project:
+    1. Run check_ash_availability first to see which tools are installed
+    2. Run ALL available directory scanners with return_output=True:
+       - scan_directory_with_semgrep (always — Python dependency, should be available)
+       - scan_directory_with_bandit (always — Python dependency, should be available)
+       - scan_directory_with_checkov (always — Python dependency, should be available)
+       - scan_directory_with_grype (requires separate install: brew install grype)
+       - scan_directory_with_syft (requires separate install: brew install syft)
+       - scan_directory_with_ash (if comprehensive scan requested — Python dependency)
+       - scan_image_with_trivy (if Dockerfiles present — requires: brew install trivy)
+    3. Skip tools that are not installed, collect successful results into a JSON array
+    4. Call generate_security_report with project_name and combined scan_results
+    5. Save the report field as SECURITY.md
+    6. Note any unavailable tools — the report shows them as GAPs automatically
+
+    The generate_security_report tool automatically loads project assumptions
+    and resolved findings from .security/config.yaml if it exists.
     """,
     dependencies=[
         'pydantic',
