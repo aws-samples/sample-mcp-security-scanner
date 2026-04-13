@@ -2,6 +2,9 @@
 inclusion: auto
 ---
 
+#[[file:steering/secure-coding.md]]
+#[[file:steering/security-report.md]]
+
 # Security Scanning Workflows
 
 ## Available Tools
@@ -16,7 +19,7 @@ All tools provided by the MCP Security Scanner:
 | `scan_with_semgrep` | 13+ languages (Python, JS, TS, Java, Go, Rust, etc.) | Always for source code |
 | `scan_with_checkov` | IaC (Terraform, CloudFormation, K8s, Dockerfile, etc.) | Always for IaC files |
 | `scan_with_trivy` | Dockerfile and IaC | Dockerfile and IaC security |
-| `scan_with_ash` | Any file type via multi-tool scanning | Comprehensive scan of a single file |
+| `scan_with_ash` | Any file type via multi-tool scanning | Only when user explicitly requests ASH |
 | `scan_image_with_trivy` | Container images (e.g., nginx:latest) | When a Dockerfile or image reference is present |
 
 ### Directory scanners (scan entire directories)
@@ -27,7 +30,7 @@ All tools provided by the MCP Security Scanner:
 | `scan_directory_with_bandit` | All Python files | Full project Python scan |
 | `scan_directory_with_checkov` | All IaC files | Full project IaC scan |
 | `scan_directory_with_grype` | Dependency manifests (package.json, requirements.txt, go.mod, etc.) | Dependency vulnerability scan |
-| `scan_directory_with_ash` | All file types via multi-tool scanning | Comprehensive project scan |
+| `scan_directory_with_ash` | All file types via multi-tool scanning | Only when user explicitly requests ASH |
 | `scan_directory_with_syft` | All dependency files | Generate Software Bill of Materials (SBOM) |
 
 ### Utility tools
@@ -74,14 +77,14 @@ If the user asks to scan a specific file or the active file:
 
 If the user asks to scan the whole project, a directory, or just says "generate a security report":
 
-1. First, run `check_ash_availability` to see which scanners are installed. This tells you which tools will work and which will fail. Inform the user of any missing tools before proceeding.
+1. First, run `check_ash_availability` to see which scanners are installed. Inform the user of any missing tools before proceeding.
 2. Run ALL applicable directory scanners with `return_output=True`. Skip tools that are not installed (per step 1):
    - `scan_directory_with_semgrep` — always (covers 13+ languages) [Python dependency]
    - `scan_directory_with_bandit` — always (Python-specific deep analysis) [Python dependency]
    - `scan_directory_with_checkov` — always (catches IaC issues) [Python dependency]
    - `scan_directory_with_grype` — always (dependency vulnerabilities) [requires separate install: `brew install grype`]
    - `scan_directory_with_syft` — always (software inventory) [requires separate install: `brew install syft`]
-   - `scan_directory_with_ash` — if user asks for comprehensive scan [Python dependency]
+   - `scan_directory_with_ash` — **only if the user explicitly asks for ASH or a comprehensive scan** — inform the user it's available but do NOT run it by default [Python dependency]
    - `scan_image_with_trivy` — if Dockerfiles or images present [requires separate install: `brew install trivy`]
 3. Collect all successful scan result JSON objects into an array (skip failed/unavailable tools)
 4. Call `generate_security_report` with `project_name` and the combined results

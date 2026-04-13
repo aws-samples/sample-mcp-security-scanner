@@ -4,9 +4,9 @@ inclusion: auto
 
 # Security Report Generation
 
-## Before Generating a Report
+## Before Scanning or Generating a Report
 
-When the user asks to generate a SECURITY.md report, check if `.security/config.yaml` exists in the project root:
+When the user asks to scan the full project/directory OR generate a SECURITY.md report, check if `.security/config.yaml` exists in the project root:
 
 **If it exists:** The tool loads it automatically. No action needed — proceed with scanning and report generation.
 
@@ -15,8 +15,8 @@ When the user asks to generate a SECURITY.md report, check if `.security/config.
 > "I don't see a `.security/config.yaml` in this project. This file lets you define project assumptions (e.g., 'authentication is handled by Cognito with MFA') and document resolved findings. These appear in the SECURITY.md report and help with threat modeling.
 >
 > Would you like me to:
-> 1. **Create a template** with example assumptions you can fill in
-> 2. **Skip it** and generate the report with only auto-generated assumptions
+> 1. **Create a template** with example assumptions you can fill in before we proceed
+> 2. **Skip it** and continue with only auto-generated assumptions
 >
 > You can always add it later."
 
