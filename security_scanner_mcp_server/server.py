@@ -1530,20 +1530,32 @@ class SecurityScanner:
             
             logger.info(f"Formatted {total_issues} Bandit findings")
             
+            # Cap findings to avoid context window overflow when returning inline
+            MAX_INLINE_FINDINGS = 100
+            truncated = total_issues > MAX_INLINE_FINDINGS
+            findings_out = findings[:MAX_INLINE_FINDINGS]
+            
             # Get metrics
             metrics = bandit_results.get('metrics', {})
             
-            return {
+            result = {
                 'success': True,
                 'tool': 'bandit',
                 'total_issues': total_issues,
-                'findings': findings,
+                'findings': findings_out,
                 'summary': severity_counts,
                 'scan_metadata': {
                     'files_scanned': metrics.get('_totals', {}).get('loc', 0),
                     'lines_of_code': metrics.get('_totals', {}).get('loc', 0)
                 }
             }
+            if truncated:
+                result['truncated'] = True
+                result['truncation_note'] = (
+                    f"Results capped at {MAX_INLINE_FINDINGS} of {total_issues} findings to prevent context overflow. "
+                    "Full results are saved to the output file."
+                )
+            return result
             
         except Exception as e:
             logger.error(f"Error formatting Bandit results: {e}")
@@ -1746,16 +1758,28 @@ class SecurityScanner:
             
             logger.info(f"Formatted {total_issues} Semgrep findings")
             
-            return {
+            # Cap findings to avoid context window overflow when returning inline
+            MAX_INLINE_FINDINGS = 100
+            truncated = total_issues > MAX_INLINE_FINDINGS
+            findings_out = findings[:MAX_INLINE_FINDINGS]
+            
+            result = {
                 'success': True,
                 'tool': 'semgrep',
                 'total_issues': total_issues,
-                'findings': findings,
+                'findings': findings_out,
                 'summary': severity_counts,
                 'scan_metadata': {
                     'errors': semgrep_results.get('errors', [])
                 }
             }
+            if truncated:
+                result['truncated'] = True
+                result['truncation_note'] = (
+                    f"Results capped at {MAX_INLINE_FINDINGS} of {total_issues} findings to prevent context overflow. "
+                    "Full results are saved to the output file."
+                )
+            return result
             
         except Exception as e:
             logger.error(f"Error formatting Semgrep results: {e}")
@@ -2141,11 +2165,16 @@ class SecurityScanner:
             elif isinstance(checkov_results, dict):
                 summary_data = checkov_results.get('summary', {})
             
-            return {
+            # Cap findings to avoid context window overflow when returning inline
+            MAX_INLINE_FINDINGS = 100
+            truncated = total_issues > MAX_INLINE_FINDINGS
+            findings_out = findings[:MAX_INLINE_FINDINGS]
+            
+            result = {
                 'success': True,
                 'tool': 'checkov',
                 'total_issues': total_issues,
-                'findings': findings,
+                'findings': findings_out,
                 'summary': severity_counts,
                 'scan_metadata': {
                     'passed': summary_data.get('passed', 0),
@@ -2154,6 +2183,13 @@ class SecurityScanner:
                     'parsing_errors': summary_data.get('parsing_errors', 0)
                 }
             }
+            if truncated:
+                result['truncated'] = True
+                result['truncation_note'] = (
+                    f"Results capped at {MAX_INLINE_FINDINGS} of {total_issues} findings to prevent context overflow. "
+                    "Full results are saved to the output file."
+                )
+            return result
             
         except Exception as e:
             logger.error(f"Error formatting Checkov results: {e}")
