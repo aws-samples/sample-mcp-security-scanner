@@ -196,9 +196,16 @@ class SecurityScanner:
             from pathlib import Path
             import os
 
-            # Create tool-specific directory in workspace root
-            workspace_root = os.environ.get('WORKSPACE_ROOT', os.getcwd())
-            output_dir = Path(workspace_root) / f'.{tool_name}'
+            # Create tool-specific directory — prefer WORKSPACE_ROOT, then the scanned directory itself
+            workspace_root = os.environ.get('WORKSPACE_ROOT')
+            if workspace_root:
+                base_dir = Path(workspace_root)
+            else:
+                # Fall back to the scanned directory so we never write to /
+                base_dir = Path(directory_path)
+                if not base_dir.is_absolute():
+                    base_dir = base_dir.resolve()
+            output_dir = base_dir / f'.{tool_name}'
             output_dir.mkdir(exist_ok=True)
 
             # Generate filename with timestamp
@@ -2027,12 +2034,14 @@ class SecurityScanner:
         
         try:
             # Run Checkov with JSON output
+            # Skip CDK framework to avoid downloading aws-cdk-lib (47MB) on every run
             cmd = [
                 'checkov',
                 '-d', directory_path,
                 '-o', 'json',
                 '--quiet',
-                '--compact'
+                '--compact',
+                '--skip-framework', 'cdk'
             ]
             
             logger.info(f"Running command: {' '.join(cmd)}")
