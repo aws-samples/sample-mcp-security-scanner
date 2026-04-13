@@ -124,16 +124,16 @@ When asked to fix security issues:
 
 ## Directory Scanning Output
 
-Directory scanning tools save results to dedicated output folders by default to prevent context window overflow:
+Directory scanning tools save results to `.security/scans/<tool>/` by default to prevent context window overflow:
 
 | Tool | Output Directory |
 |------|-----------------|
-| Semgrep | `.semgrep/` |
-| Bandit | `.bandit/` |
-| Checkov | `.checkov/` |
-| Grype | `.grype/` |
-| ASH | `.ash/` |
-| Trivy | `.trivy/` |
-| Syft | `.sbom/` |
+| Semgrep | `.security/scans/semgrep/` |
+| Bandit | `.security/scans/bandit/` |
+| Checkov | `.security/scans/checkov/` |
+| Grype | `.security/scans/grype/` |
+| ASH | `.security/scans/ash/` |
+| Trivy | `.security/scans/trivy/` |
+| Syft | `.security/scans/sbom/` |
 
 Use `return_output=True` when you need the full results inline (required for report generation).

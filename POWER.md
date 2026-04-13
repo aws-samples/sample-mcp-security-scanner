@@ -231,17 +231,17 @@ Scan the entire project directory and summarize the findings
 
 ## Directory Scanning Output
 
-Directory scanning tools save results to dedicated folders by default to prevent context window overflow:
+Directory scanning tools save results to `.security/scans/<tool>/` by default to prevent context window overflow:
 
 | Tool | Output Directory |
 |------|-----------------|
-| Semgrep | `.semgrep/` |
-| Bandit | `.bandit/` |
-| Checkov | `.checkov/` |
-| Grype | `.grype/` |
-| ASH | `.ash/` |
-| Trivy | `.trivy/` |
-| Syft | `.sbom/` |
+| Semgrep | `.security/scans/semgrep/` |
+| Bandit | `.security/scans/bandit/` |
+| Checkov | `.security/scans/checkov/` |
+| Grype | `.security/scans/grype/` |
+| ASH | `.security/scans/ash/` |
+| Trivy | `.security/scans/trivy/` |
+| Syft | `.security/scans/sbom/` |
 
 Use `return_output=True` parameter to get full results inline instead.
 

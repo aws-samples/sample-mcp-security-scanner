@@ -196,17 +196,16 @@ class SecurityScanner:
             from pathlib import Path
             import os
 
-            # Create tool-specific directory — prefer WORKSPACE_ROOT, then the scanned directory itself
+            # Create .security/scans/<tool_name> directory — all scan outputs live under .security/
             workspace_root = os.environ.get('WORKSPACE_ROOT')
             if workspace_root:
                 base_dir = Path(workspace_root)
             else:
-                # Fall back to the scanned directory so we never write to /
                 base_dir = Path(directory_path)
                 if not base_dir.is_absolute():
                     base_dir = base_dir.resolve()
-            output_dir = base_dir / f'.{tool_name}'
-            output_dir.mkdir(exist_ok=True)
+            output_dir = base_dir / '.security' / 'scans' / tool_name
+            output_dir.mkdir(parents=True, exist_ok=True)
 
             # Generate filename with timestamp
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -605,8 +604,8 @@ class SecurityScanner:
                 
                 logger.info(f"Created temporary file: {file_path}")
                 
-                # Create output directory
-                output_dir = temp_path / '.ash' / 'ash_output'
+                # Create output directory under .security/scans/ash
+                output_dir = temp_path / '.security' / 'scans' / 'ash' / 'ash_output'
                 output_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Use ASH's Python API instead of command-line
@@ -2357,7 +2356,7 @@ class SecurityScanner:
                     import os
                     
                     base_dir = Path(os.environ.get('WORKSPACE_ROOT', directory_path))
-                    sbom_dir = base_dir / '.sbom'
+                    sbom_dir = base_dir / '.security' / 'scans' / 'sbom'
                     sbom_dir.mkdir(exist_ok=True)
                     
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
