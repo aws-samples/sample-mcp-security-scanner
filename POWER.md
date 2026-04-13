@@ -99,7 +99,7 @@ When the user asks to scan the whole project or generate a report:
 1. Check for `.security/config.yaml` (see above)
 2. Run `check_ash_availability` to see which tools are installed — inform the user of any gaps
 3. Get the absolute project path first using `pwd` or equivalent — never pass `.` or a relative path
-4. Run directory scanners **sequentially** (not in parallel) **without** `return_output=True` — let them save to file by default. Note the `output_file` path in each response:
+4. Run directory scanners **in parallel** without `return_output=True` — let them save to file by default. Note the `output_file` path in each response:
    - `scan_directory_with_semgrep`
    - `scan_directory_with_bandit`
    - `scan_directory_with_checkov`

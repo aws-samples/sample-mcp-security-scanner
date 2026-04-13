@@ -79,7 +79,7 @@ If the user asks to scan the whole project, a directory, or just says "generate 
 
 1. First, run `check_ash_availability` to see which scanners are installed. Inform the user of any missing tools before proceeding.
 2. Get the absolute project path using `pwd` — never pass `.` or a relative path.
-3. Run directory scanners **sequentially** (not in parallel) **without** `return_output=True` — let them save to file by default. Always pass the absolute path. Note the output file path returned in each result:
+3. Run directory scanners **in parallel** without `return_output=True` — let them save to file by default. Always pass the absolute path. Note the output file path returned in each result:
    - `scan_directory_with_semgrep` — always (covers 13+ languages) [Python dependency]
    - `scan_directory_with_bandit` — always (Python-specific deep analysis) [Python dependency]
    - `scan_directory_with_checkov` — always (catches IaC issues) [Python dependency]
