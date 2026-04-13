@@ -724,7 +724,7 @@ class SecurityScanner:
                     scanner_summary[scanner_name]['by_severity'][severity] = \
                         scanner_summary[scanner_name]['by_severity'].get(severity, 0) + 1
                     
-                    # Format finding
+                    # Format finding — omit raw 'details' to keep response lean
                     formatted_finding = {
                         'scanner': scanner_name,
                         'severity': severity,
@@ -732,7 +732,6 @@ class SecurityScanner:
                         'message': message,
                         'file': file_path,
                         'line': line,
-                        'details': result
                     }
                     findings.append(formatted_finding)
             
@@ -1951,8 +1950,28 @@ class SecurityScanner:
 
     def _format_ash_directory_results(self, ash_results: Dict, severity_threshold: str) -> Dict[str, Any]:
         """Format ASH directory scan results into a consistent structure."""
-        # Reuse the existing _format_ash_results method
-        return self._format_ash_results(ash_results, 'directory_scan')
+        result = self._format_ash_results(ash_results, 'directory_scan')
+
+        if not result.get('success'):
+            return result
+
+        # Strip bulky 'details' (raw SARIF object) from each finding
+        for f in result.get('findings', []):
+            f.pop('details', None)
+
+        # Cap findings to avoid context window overflow
+        MAX_INLINE_FINDINGS = 100
+        findings = result.get('findings', [])
+        total = result.get('total_issues', len(findings))
+        if total > MAX_INLINE_FINDINGS:
+            result['findings'] = findings[:MAX_INLINE_FINDINGS]
+            result['truncated'] = True
+            result['truncation_note'] = (
+                f"Results capped at {MAX_INLINE_FINDINGS} of {total} findings to prevent context overflow. "
+                "Full results are saved to the output file."
+            )
+
+        return result
 
     def _format_ash_summary(self, ash_results: Dict, severity_threshold: str) -> Dict[str, Any]:
         """Format ASH results into a lightweight summary (no full finding details)."""
