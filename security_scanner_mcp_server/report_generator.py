@@ -771,10 +771,38 @@ def register_report_tool(mcp, handle_exceptions):
             try:
                 with open(p, 'r') as f:
                     data = json.load(f)
-                if isinstance(data, list):
-                    file_results.extend(data)
-                else:
+
+                # Detect raw scanner output vs already-formatted MCP response.
+                # Formatted responses always have a 'tool' key.
+                # Raw outputs need to be converted using the scanner's formatter.
+                if isinstance(data, dict) and 'tool' in data:
+                    # Already formatted — use as-is
                     file_results.append(data)
+                else:
+                    # Raw scanner output — infer tool from filename and convert
+                    fname = p.name.lower()
+                    if 'bandit' in fname:
+                        from .server import scanner as _scanner
+                        converted = _scanner._format_bandit_directory_results(data, 'LOW')
+                        file_results.append(converted)
+                    elif 'semgrep' in fname:
+                        from .server import scanner as _scanner
+                        converted = _scanner._format_semgrep_directory_results(data, 'LOW')
+                        file_results.append(converted)
+                    elif 'checkov' in fname:
+                        from .server import scanner as _scanner
+                        converted = _scanner._format_checkov_directory_results(data, 'LOW')
+                        file_results.append(converted)
+                    elif 'grype' in fname:
+                        from .server import scanner as _scanner
+                        converted = _scanner._format_grype_directory_results(data, 'LOW')
+                        file_results.append(converted)
+                    else:
+                        # Unknown format — append as-is and let _build_scanner_summaries handle it
+                        if isinstance(data, list):
+                            file_results.extend(data)
+                        else:
+                            file_results.append(data)
             except Exception as e:
                 logger.warning(f"Could not read scan result file {fp}: {e}")
 
