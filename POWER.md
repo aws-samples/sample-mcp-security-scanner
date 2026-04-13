@@ -98,7 +98,7 @@ When the user asks to scan the whole project or generate a report:
 
 1. Check for `.security/config.yaml` (see above)
 2. Run `check_ash_availability` to see which tools are installed — inform the user of any gaps
-3. Run applicable directory scanners with `return_output=True`:
+3. Run applicable directory scanners with `return_output=True`. Always pass the absolute path to the project (use `pwd` or equivalent to get it — never pass `.` or a relative path, as the MCP server process cannot resolve relative paths reliably):
    - `scan_directory_with_semgrep` — always
    - `scan_directory_with_bandit` — always
    - `scan_directory_with_checkov` — always

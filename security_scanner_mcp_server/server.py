@@ -19,6 +19,38 @@ warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
 
 from .report_generator import register_report_tool
 
+
+def resolve_directory_path(directory_path: str) -> Path:
+    """Resolve a directory path using WORKSPACE_ROOT or the path itself if absolute.
+
+    Falls back to WORKSPACE_ROOT env var when a relative path is given.
+    Never falls back to CWD because the MCP server process CWD is unreliable
+    (it is often '/' when launched via uvx).
+
+    Args:
+        directory_path: Absolute or relative directory path provided by the agent.
+
+    Returns:
+        Resolved absolute Path.
+
+    Raises:
+        ValueError: If the path is relative and WORKSPACE_ROOT is not set.
+    """
+    import os
+    dir_path = Path(directory_path)
+    if not dir_path.is_absolute():
+        workspace_root = os.environ.get('WORKSPACE_ROOT')
+        if workspace_root:
+            dir_path = Path(workspace_root) / directory_path
+            logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
+        else:
+            raise ValueError(
+                f"Relative path '{directory_path}' cannot be resolved: WORKSPACE_ROOT is not set. "
+                "Please pass an absolute path, or set WORKSPACE_ROOT in the MCP server env config "
+                "to point to your project root."
+            )
+    return dir_path.resolve()
+
 # Initialize the MCP server
 mcp = FastMCP(
     'security_scanner_mcp_server',
@@ -3148,32 +3180,19 @@ async def scan_directory_with_grype(
             }
         
         # Resolve directory path
-        import os
-        from pathlib import Path
-        
-        # Try to resolve the path
-        dir_path = Path(directory_path)
-        
-        # If it's not absolute, try to resolve it relative to workspace root
-        if not dir_path.is_absolute():
-            # First, try to get workspace root from environment variable
-            workspace_root = os.environ.get('WORKSPACE_ROOT')
-            if workspace_root:
-                dir_path = Path(workspace_root) / directory_path
-                logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
-            else:
-                # Fall back to current working directory
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
-            
-        dir_path = dir_path.resolve()
+        # Resolve directory path — never falls back to CWD (unreliable when launched via uvx)
+        try:
+            dir_path = resolve_directory_path(directory_path)
+        except ValueError as e:
+            return {'success': False, 'error': str(e), 'total_issues': 0, 'findings': []}
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}). '
+                         'Please provide an absolute path or set WORKSPACE_ROOT in the MCP server env config.',
+                'total_issues': 0,
+                'findings': []
             }
         
         if not dir_path.is_dir():
@@ -3262,32 +3281,19 @@ async def scan_directory_with_checkov(
             }
         
         # Resolve directory path
-        import os
-        from pathlib import Path
-        
-        # Try to resolve the path
-        dir_path = Path(directory_path)
-        
-        # If it's not absolute, try to resolve it relative to workspace root
-        if not dir_path.is_absolute():
-            # First, try to get workspace root from environment variable
-            workspace_root = os.environ.get('WORKSPACE_ROOT')
-            if workspace_root:
-                dir_path = Path(workspace_root) / directory_path
-                logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
-            else:
-                # Fall back to current working directory
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
-            
-        dir_path = dir_path.resolve()
+        # Resolve directory path — never falls back to CWD (unreliable when launched via uvx)
+        try:
+            dir_path = resolve_directory_path(directory_path)
+        except ValueError as e:
+            return {'success': False, 'error': str(e), 'total_issues': 0, 'findings': []}
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}). '
+                         'Please provide an absolute path or set WORKSPACE_ROOT in the MCP server env config.',
+                'total_issues': 0,
+                'findings': []
             }
         
         if not dir_path.is_dir():
@@ -3369,29 +3375,19 @@ async def scan_directory_with_bandit(
                 }
             }
         
-        # Resolve directory path
-        import os
-        from pathlib import Path
-        
-        dir_path = Path(directory_path)
-        
-        if not dir_path.is_absolute():
-            workspace_root = os.environ.get('WORKSPACE_ROOT')
-            if workspace_root:
-                dir_path = Path(workspace_root) / directory_path
-                logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
-            else:
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
-            
-        dir_path = dir_path.resolve()
+        # Resolve directory path — never falls back to CWD (unreliable when launched via uvx)
+        try:
+            dir_path = resolve_directory_path(directory_path)
+        except ValueError as e:
+            return {'success': False, 'error': str(e), 'total_issues': 0, 'findings': []}
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}). '
+                         'Please provide an absolute path or set WORKSPACE_ROOT in the MCP server env config.',
+                'total_issues': 0,
+                'findings': []
             }
         
         if not dir_path.is_dir():
@@ -3472,29 +3468,19 @@ async def scan_directory_with_semgrep(
                 }
             }
         
-        # Resolve directory path
-        import os
-        from pathlib import Path
-        
-        dir_path = Path(directory_path)
-        
-        if not dir_path.is_absolute():
-            workspace_root = os.environ.get('WORKSPACE_ROOT')
-            if workspace_root:
-                dir_path = Path(workspace_root) / directory_path
-                logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
-            else:
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
-            
-        dir_path = dir_path.resolve()
+        # Resolve directory path — never falls back to CWD (unreliable when launched via uvx)
+        try:
+            dir_path = resolve_directory_path(directory_path)
+        except ValueError as e:
+            return {'success': False, 'error': str(e), 'total_issues': 0, 'findings': []}
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}). '
+                         'Please provide an absolute path or set WORKSPACE_ROOT in the MCP server env config.',
+                'total_issues': 0,
+                'findings': []
             }
         
         if not dir_path.is_dir():
@@ -3580,29 +3566,19 @@ async def scan_directory_with_ash(
                 }
             }
         
-        # Resolve directory path
-        import os
-        from pathlib import Path
-        
-        dir_path = Path(directory_path)
-        
-        if not dir_path.is_absolute():
-            workspace_root = os.environ.get('WORKSPACE_ROOT')
-            if workspace_root:
-                dir_path = Path(workspace_root) / directory_path
-                logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
-            else:
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
-            
-        dir_path = dir_path.resolve()
+        # Resolve directory path — never falls back to CWD (unreliable when launched via uvx)
+        try:
+            dir_path = resolve_directory_path(directory_path)
+        except ValueError as e:
+            return {'success': False, 'error': str(e), 'total_issues': 0, 'findings': []}
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}). '
+                         'Please provide an absolute path or set WORKSPACE_ROOT in the MCP server env config.',
+                'total_issues': 0,
+                'findings': []
             }
         
         if not dir_path.is_dir():
@@ -3699,29 +3675,19 @@ async def scan_directory_with_syft(
                 }
             }
         
-        # Resolve directory path
-        import os
-        from pathlib import Path
-        
-        dir_path = Path(directory_path)
-        
-        if not dir_path.is_absolute():
-            workspace_root = os.environ.get('WORKSPACE_ROOT')
-            if workspace_root:
-                dir_path = Path(workspace_root) / directory_path
-                logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
-            else:
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
-            
-        dir_path = dir_path.resolve()
+        # Resolve directory path — never falls back to CWD (unreliable when launched via uvx)
+        try:
+            dir_path = resolve_directory_path(directory_path)
+        except ValueError as e:
+            return {'success': False, 'error': str(e), 'total_issues': 0, 'findings': []}
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}). '
+                         'Please provide an absolute path or set WORKSPACE_ROOT in the MCP server env config.',
+                'total_issues': 0,
+                'findings': []
             }
         
         if not dir_path.is_dir():

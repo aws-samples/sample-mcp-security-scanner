@@ -78,7 +78,7 @@ If the user asks to scan a specific file or the active file:
 If the user asks to scan the whole project, a directory, or just says "generate a security report":
 
 1. First, run `check_ash_availability` to see which scanners are installed. Inform the user of any missing tools before proceeding.
-2. Run ALL applicable directory scanners with `return_output=True`. Skip tools that are not installed (per step 1):
+2. Run ALL applicable directory scanners with `return_output=True`. Always pass the absolute path — never `.` or a relative path (the MCP server cannot resolve relative paths reliably). Use `pwd` to get the absolute path first if needed:
    - `scan_directory_with_semgrep` — always (covers 13+ languages) [Python dependency]
    - `scan_directory_with_bandit` — always (Python-specific deep analysis) [Python dependency]
    - `scan_directory_with_checkov` — always (catches IaC issues) [Python dependency]
