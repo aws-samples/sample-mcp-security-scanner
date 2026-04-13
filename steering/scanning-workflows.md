@@ -85,7 +85,7 @@ If the user asks to scan the whole project, a directory, or just says "generate 
    - `scan_directory_with_checkov` — always (catches IaC issues) [Python dependency]
    - `scan_directory_with_grype` — if installed [requires separate install: `brew install grype`]
    - `scan_directory_with_syft` — if installed [requires separate install: `brew install syft`]
-   - `scan_directory_with_ash` — **only if the user explicitly asks for ASH or a comprehensive scan** — inform the user it's available but do NOT run it by default [Python dependency]
+   - `scan_directory_with_ash` — **only if the user explicitly asks for ASH or a comprehensive scan** — run this **after** the parallel batch completes (not in parallel), as it takes 1-2 minutes and has a higher timeout risk [Python dependency]
    - `scan_image_with_trivy` — if Dockerfiles or images present [requires separate install: `brew install trivy`]
 4. Collect the output file paths from each scan result (the `output_file` field in each response)
 5. Call `generate_security_report` with `project_name` and `scan_result_files` (JSON array of the file paths) — do NOT pass `scan_results` inline for directory scans, this avoids context overflow

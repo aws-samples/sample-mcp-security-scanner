@@ -61,6 +61,8 @@ These rules apply whenever this power is active, regardless of the user's worksp
 
 Do NOT run `scan_with_ash` or `scan_directory_with_ash` by default. Only use ASH when the user explicitly asks for it or requests a "comprehensive scan". When relevant, inform the user: "ASH is also available for multi-tool aggregated scanning — let me know if you'd like to include it."
 
+ASH takes 1-2 minutes on large projects. Always run it **after** other parallel scans complete, never in the parallel batch — it risks hitting the MCP connection timeout if run alongside other long-running scans.
+
 ### Check for `.security/config.yaml` before scanning or reporting
 
 Before running a full project scan OR generating a SECURITY.md report, check if `.security/config.yaml` exists in the project root:
@@ -106,7 +108,7 @@ When the user asks to scan the whole project or generate a report:
    - `scan_directory_with_grype` — if installed
    - `scan_directory_with_syft` — if installed
    - `scan_image_with_trivy` — if Dockerfiles or images present
-   - `scan_directory_with_ash` — only if user explicitly requests it
+   - `scan_directory_with_ash` — only if user explicitly requests it — run **after** the parallel batch completes, not in parallel (takes 1-2 min)
 5. Collect the `output_file` paths from each scan result
 6. Call `generate_security_report` with `project_name` and `scan_result_files` (JSON array of the file paths) — do NOT pass inline JSON for directory scans, this avoids context overflow
 7. Save the returned `report` field as `SECURITY.md`
