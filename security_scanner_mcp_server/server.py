@@ -291,13 +291,15 @@ class SecurityScanner:
                 # Run checkov via command line — use directory mode (-d) even for single files
                 # because file mode (-f) skips framework-specific checks (e.g. Terraform checks
                 # don't run when using -f on a .tf file).
+                # Limit to the specific framework to avoid slow scans from unrelated runners.
                 # Skip 'cdk' to avoid downloading aws-cdk-lib (47MB) on every run.
+                framework = format_type if format_type != 'dockerfile' else 'dockerfile'
                 cmd = [
                     "checkov",
                     "-d", temp_dir,
                     "--output", "json",
                     "--quiet",
-                    "--skip-framework", "cdk"
+                    "--framework", framework,
                 ]
                 logger.info(f"Running command: {' '.join(cmd)}")
                 
@@ -2098,13 +2100,26 @@ class SecurityScanner:
         try:
             # Run Checkov with JSON output
             # Skip CDK framework to avoid downloading aws-cdk-lib (47MB) on every run.
+            # Limit to IaC frameworks only — scanning source code files (.py, .go, etc.)
+            # is slow and produces no useful results for Checkov.
             cmd = [
                 'checkov',
                 '-d', directory_path,
                 '-o', 'json',
                 '--quiet',
                 '--compact',
-                '--skip-framework', 'cdk'
+                '--framework', 'terraform',
+                '--framework', 'cloudformation',
+                '--framework', 'kubernetes',
+                '--framework', 'dockerfile',
+                '--framework', 'arm',
+                '--framework', 'bicep',
+                '--framework', 'serverless',
+                '--framework', 'helm',
+                '--framework', 'github_actions',
+                '--framework', 'gitlab_ci',
+                '--framework', 'ansible',
+                '--framework', 'secrets',
             ]
             
             logger.info(f"Running command: {' '.join(cmd)}")
