@@ -290,7 +290,8 @@ class SecurityScanner:
 
                 # Run checkov via command line — use directory mode (-d) even for single files
                 # because file mode (-f) skips framework-specific checks (e.g. Terraform checks
-                # don't run when using -f on a .tf file)
+                # don't run when using -f on a .tf file).
+                # Skip 'cdk' to avoid downloading aws-cdk-lib (47MB) on every run.
                 cmd = [
                     "checkov",
                     "-d", temp_dir,
@@ -2096,7 +2097,7 @@ class SecurityScanner:
         
         try:
             # Run Checkov with JSON output
-            # Skip CDK framework to avoid downloading aws-cdk-lib (47MB) on every run
+            # Skip CDK framework to avoid downloading aws-cdk-lib (47MB) on every run.
             cmd = [
                 'checkov',
                 '-d', directory_path,
