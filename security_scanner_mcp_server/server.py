@@ -288,8 +288,16 @@ class SecurityScanner:
                 with open(file_path, 'w') as f:
                     f.write(code)
 
-                # Run checkov via command line for better compatibility
-                cmd = ["checkov", "-f", file_path, "--output", "json", "--quiet"]
+                # Run checkov via command line — use directory mode (-d) even for single files
+                # because file mode (-f) skips framework-specific checks (e.g. Terraform checks
+                # don't run when using -f on a .tf file)
+                cmd = [
+                    "checkov",
+                    "-d", temp_dir,
+                    "--output", "json",
+                    "--quiet",
+                    "--skip-framework", "cdk"
+                ]
                 logger.info(f"Running command: {' '.join(cmd)}")
                 
                 result = subprocess.run(
@@ -2115,17 +2123,17 @@ class SecurityScanner:
                 if result.stdout:
                     checkov_results = json.loads(result.stdout)
                 else:
-                    logger.warning("No Checkov output received")
+                    logger.warning(f"No Checkov output received (exit code: {result.returncode})")
+                    if result.stderr:
+                        logger.warning(f"Checkov stderr: {result.stderr[:500]}")
+                    # Exit code 2 means no IaC files found — not an error
                     return {
                         'success': True,
                         'tool': 'checkov',
                         'total_issues': 0,
+                        'note': 'No IaC files found in directory or Checkov produced no output.',
                         'severity_counts': {
-                            'critical': 0,
-                            'high': 0,
-                            'medium': 0,
-                            'low': 0,
-                            'info': 0
+                            'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0
                         }
                     }
             except json.JSONDecodeError as e:
