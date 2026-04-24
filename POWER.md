@@ -115,7 +115,9 @@ Scan the entire project directory and summarize the findings
 
 ## Directory Scanning Output
 
-Directory scanning tools save results to dedicated folders by default to prevent context window overflow:
+When calling any `scan_directory_with_*` tool, always pass the absolute path of the project as `directory_path`. Never use `.`, `..`, or relative paths — the MCP server runs in an isolated environment and cannot infer the workspace location.
+
+Output is saved inside the scanned directory under dedicated folders to prevent context window overflow:
 
 | Tool | Output Directory |
 |------|-----------------|

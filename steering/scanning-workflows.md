@@ -54,4 +54,8 @@ The report includes: executive summary, findings by severity, STRIDE threat mode
 
 ## Directory Scanning
 
-For full-project scans, use `scan_directory_with_*` tools. These save results to dedicated output folders (`.semgrep/`, `.bandit/`, `.checkov/`, `.grype/`, `.ash/`, `.trivy/`, `.sbom/`) to avoid flooding the context window. Use `return_output=True` only when you need the full results inline.
+For full-project scans, use `scan_directory_with_*` tools.
+
+**Always pass the absolute path of the project as `directory_path`** — never use `.`, `..`, or relative paths. The MCP server cannot reliably infer the workspace from its own working directory. If you don't know the absolute path, read it from the user's environment context before calling the tool.
+
+Output is saved inside the scanned directory under dedicated folders (`.semgrep/`, `.bandit/`, `.checkov/`, `.grype/`, `.ash/`, `.trivy/`, `.sbom/`) to avoid flooding the context window. Use `return_output=True` only when you need the full results inline.

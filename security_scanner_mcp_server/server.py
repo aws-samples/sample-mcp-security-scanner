@@ -138,7 +138,9 @@ class SecurityScanner:
             import os
 
             # Create tool-specific directory in workspace root
-            workspace_root = os.environ.get('WORKSPACE_ROOT', os.getcwd())
+            workspace_root = os.environ.get('WORKSPACE_ROOT')
+            if not workspace_root:
+                workspace_root = str(Path(directory_path).resolve())
             output_dir = Path(workspace_root) / f'.{tool_name}'
             output_dir.mkdir(exist_ok=True)
 
@@ -1944,12 +1946,14 @@ class SecurityScanner:
         
         try:
             # Run Checkov with JSON output
+            # Skip secrets framework to avoid detect-secrets dependency conflict
             cmd = [
                 'checkov',
                 '-d', directory_path,
                 '-o', 'json',
                 '--quiet',
-                '--compact'
+                '--compact',
+                '--skip-framework', 'secrets'
             ]
             
             logger.info(f"Running command: {' '.join(cmd)}")
@@ -1961,13 +1965,22 @@ class SecurityScanner:
                 timeout=300  # 5 minutes timeout
             )
             
-            # Checkov returns non-zero when issues are found, which is expected
+            # Checkov exit codes: 0 = no issues, 1 = issues found, 2 = error
             logger.info(f"Checkov exit code: {result.returncode}")
             
             # Parse JSON output
             try:
                 if result.stdout:
                     checkov_results = json.loads(result.stdout)
+                elif result.returncode == 2:
+                    # Exit code 2 with no stdout means Checkov errored out
+                    logger.error(f"Checkov failed with exit code 2. stderr: {result.stderr}")
+                    return {
+                        'success': False,
+                        'tool': 'checkov',
+                        'error': f'Checkov scan failed: {result.stderr.strip() or "No output from Checkov (exit code 2). The directory may contain no supported IaC files or Checkov encountered an error."}',
+                        'stderr': result.stderr
+                    }
                 else:
                     logger.warning("No Checkov output received")
                     return {
@@ -2223,7 +2236,9 @@ class SecurityScanner:
                         import os
                         
                         # Create .sbom directory in workspace root
-                        workspace_root = os.environ.get('WORKSPACE_ROOT', os.getcwd())
+                        workspace_root = os.environ.get('WORKSPACE_ROOT')
+                        if not workspace_root:
+                            workspace_root = str(Path(directory_path).resolve())
                         sbom_dir = Path(workspace_root) / '.sbom'
                         sbom_dir.mkdir(exist_ok=True)
                         
@@ -2271,7 +2286,9 @@ class SecurityScanner:
                     from pathlib import Path
                     import os
                     
-                    workspace_root = os.environ.get('WORKSPACE_ROOT', os.getcwd())
+                    workspace_root = os.environ.get('WORKSPACE_ROOT')
+                    if not workspace_root:
+                        workspace_root = str(Path(directory_path).resolve())
                     sbom_dir = Path(workspace_root) / '.sbom'
                     sbom_dir.mkdir(exist_ok=True)
                     
@@ -3136,17 +3153,18 @@ async def scan_directory_with_grype(
                 logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
             else:
                 # Fall back to current working directory
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
+                return {
+                    'success': False,
+                    'error': f'Cannot resolve relative path: {directory_path}. Provide an absolute path or set WORKSPACE_ROOT env var in MCP config.'
+                }
             
         dir_path = dir_path.resolve()
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path})',
+                'hint': 'Please provide an absolute path or set WORKSPACE_ROOT environment variable in MCP config.'
             }
         
         if not dir_path.is_dir():
@@ -3250,17 +3268,18 @@ async def scan_directory_with_checkov(
                 logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
             else:
                 # Fall back to current working directory
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
+                return {
+                    'success': False,
+                    'error': f'Cannot resolve relative path: {directory_path}. Provide an absolute path or set WORKSPACE_ROOT env var in MCP config.'
+                }
             
         dir_path = dir_path.resolve()
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path})',
+                'hint': 'Please provide an absolute path or set WORKSPACE_ROOT environment variable in MCP config.'
             }
         
         if not dir_path.is_dir():
@@ -3354,17 +3373,18 @@ async def scan_directory_with_bandit(
                 dir_path = Path(workspace_root) / directory_path
                 logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
             else:
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
+                return {
+                    'success': False,
+                    'error': f'Cannot resolve relative path: {directory_path}. Provide an absolute path or set WORKSPACE_ROOT env var in MCP config.'
+                }
             
         dir_path = dir_path.resolve()
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path})',
+                'hint': 'Please provide an absolute path or set WORKSPACE_ROOT environment variable in MCP config.'
             }
         
         if not dir_path.is_dir():
@@ -3457,17 +3477,18 @@ async def scan_directory_with_semgrep(
                 dir_path = Path(workspace_root) / directory_path
                 logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
             else:
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
+                return {
+                    'success': False,
+                    'error': f'Cannot resolve relative path: {directory_path}. Provide an absolute path or set WORKSPACE_ROOT env var in MCP config.'
+                }
             
         dir_path = dir_path.resolve()
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path})',
+                'hint': 'Please provide an absolute path or set WORKSPACE_ROOT environment variable in MCP config.'
             }
         
         if not dir_path.is_dir():
@@ -3565,17 +3586,18 @@ async def scan_directory_with_ash(
                 dir_path = Path(workspace_root) / directory_path
                 logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
             else:
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
+                return {
+                    'success': False,
+                    'error': f'Cannot resolve relative path: {directory_path}. Provide an absolute path or set WORKSPACE_ROOT env var in MCP config.'
+                }
             
         dir_path = dir_path.resolve()
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path})',
+                'hint': 'Please provide an absolute path or set WORKSPACE_ROOT environment variable in MCP config.'
             }
         
         if not dir_path.is_dir():
@@ -3684,17 +3706,18 @@ async def scan_directory_with_syft(
                 dir_path = Path(workspace_root) / directory_path
                 logger.info(f"Resolved path using WORKSPACE_ROOT: {dir_path}")
             else:
-                dir_path = Path.cwd() / directory_path
-                logger.info(f"Resolved path using CWD: {dir_path}")
+                return {
+                    'success': False,
+                    'error': f'Cannot resolve relative path: {directory_path}. Provide an absolute path or set WORKSPACE_ROOT env var in MCP config.'
+                }
             
         dir_path = dir_path.resolve()
         
         if not dir_path.exists():
-            workspace_hint = f" (WORKSPACE_ROOT: {os.environ.get('WORKSPACE_ROOT', 'not set')})" if not os.environ.get('WORKSPACE_ROOT') else ""
             return {
                 'success': False,
-                'error': f'Directory not found: {directory_path} (resolved to: {dir_path}){workspace_hint}',
-                'hint': 'Please provide an absolute path or ensure the relative path is correct. Set WORKSPACE_ROOT environment variable in MCP config for automatic resolution.'
+                'error': f'Directory not found: {directory_path} (resolved to: {dir_path})',
+                'hint': 'Please provide an absolute path or set WORKSPACE_ROOT environment variable in MCP config.'
             }
         
         if not dir_path.is_dir():

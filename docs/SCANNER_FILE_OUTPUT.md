@@ -337,7 +337,7 @@ print(f"By language: {result['language_counts']}")
 
 ### Setting Workspace Root
 
-Optionally set the `WORKSPACE_ROOT` environment variable in your MCP configuration to control where scan output is saved:
+Set the `WORKSPACE_ROOT` environment variable in your MCP configuration to control where scan output is saved:
 
 ```json
 {
@@ -350,7 +350,7 @@ Optionally set the `WORKSPACE_ROOT` environment variable in your MCP configurati
         "security_scanner_mcp_server"
       ],
       "env": {
-        "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)",
+        "WORKSPACE_ROOT": "/path/to/your/workspace",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
       "timeout": 120000,
@@ -363,7 +363,7 @@ Optionally set the `WORKSPACE_ROOT` environment variable in your MCP configurati
 
 Replace `/path/to/sample-mcp-security-scanner` with your actual repository path and `/path/to/your/workspace` with your workspace directory.
 
-If `WORKSPACE_ROOT` is not set, the current working directory is used as the workspace root.
+`WORKSPACE_ROOT` is required when installing via MCP config. Without it, the server cannot resolve project paths correctly.
 
 ## Summary
 
