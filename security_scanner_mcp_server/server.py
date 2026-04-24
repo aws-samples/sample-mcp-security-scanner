@@ -4,6 +4,7 @@
 import json
 import tempfile
 import os
+import sys
 import subprocess
 import shutil
 import warnings
@@ -1782,66 +1783,75 @@ class SecurityScanner:
             import tempfile
             from pathlib import Path
             
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
-                output_dir = temp_path / 'ash_output'
-                output_dir.mkdir(parents=True, exist_ok=True)
+            temp_dir = tempfile.mkdtemp(prefix='ash_scan_')
+            temp_path = Path(temp_dir)
+            output_dir = temp_path / 'ash_output'
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            logger.info(f"ASH output directory: {output_dir}")
+            logger.info(f"Running ASH scan with severity threshold: {severity_threshold}")
+            
+            # Run ASH in a subprocess to isolate its threads/atexit handlers
+            # which would otherwise block the MCP event loop from returning.
+            ash_runner = f"""
+import sys
+from automated_security_helper.core.enums import AshLogLevel, RunMode
+from automated_security_helper.interactions.run_ash_scan import run_ash_scan
+try:
+    run_ash_scan(
+        source_dir={directory_path!r},
+        output_dir={str(output_dir)!r},
+        config=None,
+        mode=RunMode.local,
+        log_level=AshLogLevel.ERROR,
+        fail_on_findings=False,
+        show_summary=False,
+        exclude_scanners=['semgrep'],
+    )
+except Exception as e:
+    print(f'ASH error: {{e}}', file=sys.stderr)
+sys.exit(0)
+"""
+            ash_proc = subprocess.run(
+                [sys.executable, '-c', ash_runner],
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            
+            if ash_proc.returncode != 0:
+                logger.warning(f"ASH subprocess stderr: {ash_proc.stderr[:500]}")
+            logger.info(f"ASH scan completed (subprocess exit code: {ash_proc.returncode})")
+            
+            # Parse the aggregated results file
+            results_file = output_dir / 'ash_aggregated_results.json'
+            if results_file.exists():
+                with open(results_file, 'r') as f:
+                    ash_results_text = f.read()
+                    ash_results = json.loads(ash_results_text)
                 
-                logger.info(f"ASH output directory: {output_dir}")
+                logger.info(f"Successfully parsed ASH results")
                 
-                # Use ASH's Python API
-                from automated_security_helper.core.enums import AshLogLevel, RunMode
-                from automated_security_helper.interactions.run_ash_scan import run_ash_scan
+                # If user explicitly requests output, return full results
+                if return_output:
+                    return self._format_ash_directory_results(ash_results, severity_threshold)
                 
-                logger.info(f"Running ASH scan with severity threshold: {severity_threshold}")
+                # Otherwise, save to file and return summary
+                file_info = self._save_scan_output('ash', directory_path, ash_results_text, 'json')
+                summary = self._format_ash_summary(ash_results, severity_threshold)
                 
-                # Run the scan using ASH's Python API
-                try:
-                    run_ash_scan(
-                        source_dir=directory_path,
-                        output_dir=str(output_dir),
-                        config=None,
-                        mode=RunMode.local,
-                        log_level=AshLogLevel.ERROR,
-                        fail_on_findings=False,
-                        show_summary=False,
-                        exclude_scanners=['semgrep'],  # Exclude semgrep to avoid duplication
-                    )
-                    
-                    logger.info(f"ASH scan completed")
-                    
-                except Exception as scan_error:
-                    logger.warning(f"ASH scan completed with error (may be expected): {scan_error}")
-                
-                # Parse the aggregated results file
-                results_file = output_dir / 'ash_aggregated_results.json'
-                if results_file.exists():
-                    with open(results_file, 'r') as f:
-                        ash_results_text = f.read()
-                        ash_results = json.loads(ash_results_text)
-                    
-                    logger.info(f"Successfully parsed ASH results")
-                    
-                    # If user explicitly requests output, return full results
-                    if return_output:
-                        return self._format_ash_directory_results(ash_results, severity_threshold)
-                    
-                    # Otherwise, save to file and return summary
-                    file_info = self._save_scan_output('ash', directory_path, ash_results_text, 'json')
-                    summary = self._format_ash_summary(ash_results, severity_threshold)
-                    
-                    return {
-                        'success': True,
-                        'tool': 'ash',
-                        **file_info,
-                        **summary
-                    }
-                else:
-                    logger.warning(f"ASH results file not found: {results_file}")
-                    return {
-                        'success': False,
-                        'error': 'ASH results file not found - scan may have failed',
-                    }
+                return {
+                    'success': True,
+                    'tool': 'ash',
+                    **file_info,
+                    **summary
+                }
+            else:
+                logger.warning(f"ASH results file not found: {results_file}")
+                return {
+                    'success': False,
+                    'error': 'ASH results file not found - scan may have failed',
+                }
                     
         except ImportError as e:
             logger.error(f"ASH Python API not available: {e}")
