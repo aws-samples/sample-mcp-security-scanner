@@ -191,7 +191,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
+        "WORKSPACE_ROOT": "/path/to/your/workspace"
       },
       "timeout": 120000,
       "disabled": false,
@@ -215,7 +215,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
+        "WORKSPACE_ROOT": "/path/to/your/workspace"
       },
       "timeout": 120000,
       "disabled": false,
@@ -256,7 +256,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
+        "WORKSPACE_ROOT": "/path/to/your/workspace"
       },
       "timeout": 120000
     }
@@ -278,7 +278,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
+        "WORKSPACE_ROOT": "/path/to/your/workspace"
       },
       "timeout": 120000
     }
@@ -316,7 +316,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
+        "WORKSPACE_ROOT": "/path/to/your/workspace"
       },
       "timeout": 120000,
       "disabled": false,
@@ -340,7 +340,7 @@ Replace `/path/to/sample-mcp-security-scanner` with your actual repository path:
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "WORKSPACE_ROOT": "/path/to/your/workspace (optional, defaults to current working directory)"
+        "WORKSPACE_ROOT": "/path/to/your/workspace"
       },
       "timeout": 120000,
       "disabled": false,

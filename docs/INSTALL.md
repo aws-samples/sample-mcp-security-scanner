@@ -28,7 +28,7 @@ Add to your MCP configuration file:
       "args": ["security_scanner_mcp_server"],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "WORKSPACE_ROOT": "PATH_TO_YOUR_WORKSPACE (optional, defaults to current working directory)"
+        "WORKSPACE_ROOT": "PATH_TO_YOUR_WORKSPACE"
       },
       "timeout": 120000,
       "disabled": false,
