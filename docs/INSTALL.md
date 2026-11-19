@@ -5,10 +5,12 @@
 ### 1. Install with uv (Recommended)
 
 ```bash
-# Install the MCP server using uv
-uvx security_scanner_mcp_server
+# Run the MCP server directly from the official repository.
+# Always install from this Git source, not from PyPI: an unrelated third party
+# has published a package named "security_scanner_mcp_server" on public PyPI.
+uvx --from git+https://github.com/aws-samples/sample-mcp-security-scanner.git security_scanner_mcp_server
 
-# Or install from local directory
+# Or install from a local clone
 cd sample-mcp-security-scanner
 uv pip install -e .
 ```
@@ -25,7 +27,11 @@ Add to your MCP configuration file:
   "mcpServers": {
     "security-scanner": {
       "command": "uvx",
-      "args": ["security_scanner_mcp_server"],
+      "args": [
+        "--from",
+        "git+https://github.com/aws-samples/sample-mcp-security-scanner.git",
+        "security_scanner_mcp_server"
+      ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
         "WORKSPACE_ROOT": "PATH_TO_YOUR_WORKSPACE"
