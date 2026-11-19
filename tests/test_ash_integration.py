@@ -167,7 +167,7 @@ def test_ash_scan_terraform():
     # Sample Terraform code with security issues (matching test_scanner.py)
     terraform_code = """
 resource "aws_s3_bucket" "insecure_bucket" {
-    bucket = "my-insecure-bucket"
+    bucket = "amzn-s3-demo-bucket"
     acl    = "public-read"
 }
 

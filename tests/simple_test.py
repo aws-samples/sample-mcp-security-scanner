@@ -4,7 +4,7 @@
 import json
 import tempfile
 import os
-import subprocess
+import subprocess  # nosec B404 - test harness invokes local scanners with fixed argument lists
 
 def test_checkov_basic():
     """Test basic Checkov functionality."""
@@ -12,7 +12,7 @@ def test_checkov_basic():
     
     terraform_code = '''
 resource "aws_s3_bucket" "test" {
-    bucket = "test-bucket"
+    bucket = "amzn-s3-demo-bucket"
     acl    = "public-read"
 }
 '''
@@ -23,8 +23,10 @@ resource "aws_s3_bucket" "test" {
             with open(file_path, 'w') as f:
                 f.write(terraform_code)
             
-            cmd = f"checkov -f {file_path} --output json --quiet"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            # Pass a fixed argument list with shell=False so no shell parses
+            # the command and the temp file path cannot inject extra commands.
+            cmd = ["checkov", "-f", file_path, "--output", "json", "--quiet"]
+            result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603  # nosemgrep
             
             if result.stdout:
                 try:
@@ -59,8 +61,10 @@ def unsafe_function(data):
             with open(file_path, 'w') as f:
                 f.write(python_code)
             
-            cmd = f"semgrep --config=auto --json --quiet {file_path}"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            # Pass a fixed argument list with shell=False so no shell parses
+            # the command and the temp file path cannot inject extra commands.
+            cmd = ["semgrep", "--config=auto", "--json", "--quiet", file_path]
+            result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603  # nosemgrep
             
             if result.stdout:
                 try:
@@ -96,8 +100,10 @@ def unsafe_function(data):
             with open(file_path, 'w') as f:
                 f.write(python_code)
             
-            cmd = f"bandit -f json {file_path}"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            # Pass a fixed argument list with shell=False so no shell parses
+            # the command and the temp file path cannot inject extra commands.
+            cmd = ["bandit", "-f", "json", file_path]
+            result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603  # nosemgrep
             
             if result.stdout:
                 try:

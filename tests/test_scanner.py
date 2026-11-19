@@ -16,7 +16,7 @@ async def test_checkov():
     
     terraform_code = '''
 resource "aws_s3_bucket" "insecure_bucket" {
-    bucket = "my-insecure-bucket"
+    bucket = "amzn-s3-demo-bucket"
     acl    = "public-read"
 }
 
