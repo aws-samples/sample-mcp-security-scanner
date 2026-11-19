@@ -4,8 +4,9 @@
 import json
 import tempfile
 import os
+import re
 import sys
-import subprocess
+import subprocess  # nosec B404 - this server's purpose is to run external scanners; all calls are hardened below
 import shutil
 import warnings
 from typing import Dict, Any, List, Optional
@@ -80,6 +81,108 @@ def handle_exceptions(func):
             raise ValueError(f'Error in {func.__name__}: {str(e)}')
     
     return wrapper
+
+
+# ---------------------------------------------------------------------------
+# Hardened subprocess execution
+#
+# This server exists to invoke external security scanners, so calling other
+# programs is unavoidable. Every invocation goes through _run_tool(), which
+# guarantees that:
+#   * the command is always a list of strings run with shell=False, so no shell
+#     interprets the arguments and shell metacharacters have no meaning;
+#   * the program being run is on an explicit allowlist and is resolved to an
+#     absolute path before execution, so scanned content can never choose which
+#     binary runs;
+#   * user-supplied values (directory paths, image names) are validated and
+#     normalised by the helpers below before they ever reach an argument list.
+# ---------------------------------------------------------------------------
+
+# Security tools this server is permitted to execute.
+_ALLOWED_EXECUTABLES = frozenset(
+    {'checkov', 'semgrep', 'bandit', 'trivy', 'syft', 'grype'}
+)
+
+# Conservative container image reference pattern, e.g.
+# "registry/namespace/name:tag@sha256:...". Rejects anything starting with '-'
+# (which could be interpreted as a command-line option) or containing shell or
+# whitespace characters.
+_IMAGE_NAME_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,254}$')
+
+# Output formats Syft is allowed to emit.
+_SYFT_OUTPUT_FORMATS = frozenset(
+    {'json', 'cyclonedx-json', 'spdx-json', 'table'}
+)
+
+
+def _resolve_executable(name: str) -> str:
+    """Resolve an allowlisted tool name to an absolute path, or raise."""
+    if name == sys.executable:
+        # Running our own Python interpreter (used to isolate ASH).
+        return name
+    if name not in _ALLOWED_EXECUTABLES:
+        raise ValueError(f"Executable '{name}' is not allowed")
+    resolved = shutil.which(name)
+    if not resolved:
+        raise FileNotFoundError(f"Required tool '{name}' was not found in PATH")
+    return resolved
+
+
+def _run_tool(cmd: List[str], timeout: Optional[int] = None) -> subprocess.CompletedProcess:
+    """Run an allowlisted security tool with a fixed argument vector.
+
+    Centralising every subprocess call here keeps the security controls in a
+    single reviewed place: the command must be a list of strings, the
+    executable must be on the allowlist and is resolved to an absolute path, and
+    the shell is never used. This removes any command-injection path even though
+    the server's job is to run external scanners.
+    """
+    if not isinstance(cmd, list) or not cmd:
+        raise ValueError('Command must be a non-empty list of arguments')
+    if not all(isinstance(arg, str) for arg in cmd):
+        raise ValueError('All command arguments must be strings')
+
+    resolved_cmd = [_resolve_executable(cmd[0]), *cmd[1:]]
+
+    # Safe by construction: the executable is allowlisted and resolved to an
+    # absolute path above, shell=False, and the arguments are a fixed list (not
+    # a shell string), so scanned content cannot influence the command. This is
+    # the single audited subprocess call site for the whole server.
+    return subprocess.run(  # nosec B603 B607  # nosemgrep
+        resolved_cmd,
+        shell=False,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def _validate_directory_path(directory_path: str) -> str:
+    """Validate and normalise a user-supplied directory path.
+
+    Returns an absolute, resolved path (which never starts with '-', so it
+    cannot be mistaken for a command-line option). Raises ValueError if the
+    path is missing or is not a directory.
+    """
+    if not isinstance(directory_path, str) or not directory_path.strip():
+        raise ValueError('directory_path must be a non-empty string')
+    resolved = Path(directory_path).expanduser().resolve()
+    if not resolved.exists():
+        raise ValueError(f'Directory does not exist: {directory_path}')
+    if not resolved.is_dir():
+        raise ValueError(f'Path is not a directory: {directory_path}')
+    return str(resolved)
+
+
+def _validate_image_name(image_name: str) -> str:
+    """Validate a container image reference before passing it to a scanner."""
+    if not isinstance(image_name, str) or not image_name.strip():
+        raise ValueError('image_name must be a non-empty string')
+    image_name = image_name.strip()
+    if not _IMAGE_NAME_PATTERN.match(image_name):
+        raise ValueError(f'Invalid container image reference: {image_name}')
+    return image_name
+
 
 class SecurityScanner:
     """Security scanner class with support for multiple tools."""
@@ -196,11 +299,7 @@ class SecurityScanner:
                 cmd = ["checkov", "-f", file_path, "--output", "json", "--quiet"]
                 logger.info(f"Running command: {' '.join(cmd)}")
                 
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True
-                )
+                result = _run_tool(cmd)
 
                 logger.info(f"Checkov exit code: {result.returncode}")
                 logger.info(f"Checkov stdout length: {len(result.stdout) if result.stdout else 0}")
@@ -276,11 +375,7 @@ class SecurityScanner:
                     file_path
                 ]
                 
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True
-                )
+                result = _run_tool(cmd)
 
                 if result.stdout:
                     try:
@@ -324,11 +419,7 @@ class SecurityScanner:
 
                 # Run bandit with JSON output
                 cmd = ["bandit", "-f", "json", file_path]
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True
-                )
+                result = _run_tool(cmd)
 
                 if result.stdout:
                     try:
@@ -721,12 +812,7 @@ class SecurityScanner:
     def check_syft_installation(self) -> Dict[str, Any]:
         """Check if Syft is installed and available."""
         try:
-            result = subprocess.run(
-                ['syft', 'version'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = _run_tool(['syft', 'version'], timeout=10)
             
             if result.returncode == 0:
                 # Parse version from output
@@ -761,12 +847,7 @@ class SecurityScanner:
     def check_grype_installation(self) -> Dict[str, Any]:
         """Check if Grype is installed and available."""
         try:
-            result = subprocess.run(
-                ['grype', 'version'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = _run_tool(['grype', 'version'], timeout=10)
             
             if result.returncode == 0:
                 # Parse version from output
@@ -801,12 +882,7 @@ class SecurityScanner:
     def check_trivy_installation(self) -> Dict[str, Any]:
         """Check if Trivy is installed and available."""
         try:
-            result = subprocess.run(
-                ['trivy', '--version'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = _run_tool(['trivy', '--version'], timeout=10)
             
             if result.returncode == 0:
                 # Parse version from output (format: "Version: X.Y.Z")
@@ -841,12 +917,7 @@ class SecurityScanner:
     def check_bandit_installation(self) -> Dict[str, Any]:
         """Check if Bandit is installed and available."""
         try:
-            result = subprocess.run(
-                ['bandit', '--version'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = _run_tool(['bandit', '--version'], timeout=10)
             
             if result.returncode == 0:
                 # Parse version from output
@@ -881,12 +952,7 @@ class SecurityScanner:
     def check_semgrep_installation(self) -> Dict[str, Any]:
         """Check if Semgrep is installed and available."""
         try:
-            result = subprocess.run(
-                ['semgrep', '--version'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = _run_tool(['semgrep', '--version'], timeout=10)
             
             if result.returncode == 0:
                 # Parse version from output
@@ -921,12 +987,7 @@ class SecurityScanner:
     def check_checkov_installation(self) -> Dict[str, Any]:
         """Check if Checkov is installed and available."""
         try:
-            result = subprocess.run(
-                ['checkov', '--version'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = _run_tool(['checkov', '--version'], timeout=10)
             
             if result.returncode == 0:
                 # Parse version from output
@@ -991,12 +1052,7 @@ class SecurityScanner:
                 
                 logger.info(f"Running command: {' '.join(cmd)}")
                 
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=120  # 2 minutes timeout
-                )
+                result = _run_tool(cmd, timeout=120)  # 2 minutes timeout
                 
                 # Trivy returns non-zero when issues are found, which is expected
                 logger.info(f"Trivy exit code: {result.returncode}")
@@ -1049,6 +1105,7 @@ class SecurityScanner:
         logger.info(f"Starting Trivy image scan: {image_name}")
         
         try:
+            image_name = _validate_image_name(image_name)
             # Run Trivy with JSON output
             cmd = [
                 'trivy',
@@ -1060,12 +1117,7 @@ class SecurityScanner:
             
             logger.info(f"Running command: {' '.join(cmd)}")
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=600  # 10 minutes timeout for image download
-            )
+            result = _run_tool(cmd, timeout=600)  # 10 minutes timeout for image download
             
             # Trivy returns non-zero when issues are found, which is expected
             logger.info(f"Trivy exit code: {result.returncode}")
@@ -1353,6 +1405,7 @@ class SecurityScanner:
         logger.info(f"Starting Bandit directory scan: {directory_path}")
         
         try:
+            directory_path = _validate_directory_path(directory_path)
             # Run Bandit with JSON output
             cmd = [
                 'bandit',
@@ -1363,12 +1416,7 @@ class SecurityScanner:
             
             logger.info(f"Running command: {' '.join(cmd)}")
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
+            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
             
             # Bandit returns non-zero when issues are found, which is expected
             logger.info(f"Bandit exit code: {result.returncode}")
@@ -1558,6 +1606,7 @@ class SecurityScanner:
         logger.info(f"Starting Semgrep directory scan: {directory_path}")
         
         try:
+            directory_path = _validate_directory_path(directory_path)
             # Run Semgrep with JSON output
             cmd = [
                 'semgrep',
@@ -1571,12 +1620,7 @@ class SecurityScanner:
             
             logger.info(f"Running command: {' '.join(cmd)}")
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
+            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
             
             # Semgrep returns non-zero when issues are found, which is expected
             logger.info(f"Semgrep exit code: {result.returncode}")
@@ -1779,6 +1823,7 @@ class SecurityScanner:
             raise ValueError(f"ASH is not available: {ash_check.get('error', 'Unknown error')}")
         
         try:
+            directory_path = _validate_directory_path(directory_path)
             # Create output directory
             import tempfile
             from pathlib import Path
@@ -1812,12 +1857,7 @@ except Exception as e:
     print(f'ASH error: {{e}}', file=sys.stderr)
 sys.exit(0)
 """
-            ash_proc = subprocess.run(
-                [sys.executable, '-c', ash_runner],
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
+            ash_proc = _run_tool([sys.executable, '-c', ash_runner], timeout=300)
             
             if ash_proc.returncode != 0:
                 logger.warning(f"ASH subprocess stderr: {ash_proc.stderr[:500]}")
@@ -1955,6 +1995,7 @@ sys.exit(0)
         logger.info(f"Starting Checkov directory scan: {directory_path}")
         
         try:
+            directory_path = _validate_directory_path(directory_path)
             # Run Checkov with JSON output
             # Skip secrets framework to avoid detect-secrets dependency conflict
             cmd = [
@@ -1968,12 +2009,7 @@ sys.exit(0)
             
             logger.info(f"Running command: {' '.join(cmd)}")
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
+            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
             
             # Checkov exit codes: 0 = no issues, 1 = issues found, 2 = error
             logger.info(f"Checkov exit code: {result.returncode}")
@@ -2209,6 +2245,13 @@ sys.exit(0)
         logger.info(f"Starting Syft directory scan: {directory_path} (save_sbom={save_sbom})")
         
         try:
+            directory_path = _validate_directory_path(directory_path)
+            if output_format not in _SYFT_OUTPUT_FORMATS:
+                raise ValueError(
+                    f"Unsupported Syft output format: {output_format}. "
+                    f"Supported: {sorted(_SYFT_OUTPUT_FORMATS)}"
+                )
+
             # Run Syft with JSON output
             cmd = [
                 'syft',
@@ -2219,12 +2262,7 @@ sys.exit(0)
             
             logger.info(f"Running command: {' '.join(cmd)}")
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
+            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
             
             if result.returncode != 0:
                 logger.error(f"Syft command failed with return code {result.returncode}")
@@ -2458,6 +2496,7 @@ sys.exit(0)
         logger.info(f"Starting Grype directory scan: {directory_path}")
         
         try:
+            directory_path = _validate_directory_path(directory_path)
             # Run Grype with JSON output
             cmd = [
                 'grype',
@@ -2468,12 +2507,7 @@ sys.exit(0)
             
             logger.info(f"Running command: {' '.join(cmd)}")
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
+            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
             
             if result.returncode not in [0, 1]:  # Grype returns 1 when vulnerabilities are found
                 logger.error(f"Grype command failed with return code {result.returncode}")
@@ -3129,7 +3163,7 @@ async def scan_directory_with_grype(
     Note:
         Grype must be installed and available in PATH. Install with:
         - macOS: brew install grype
-        - Linux: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh
+        - Linux: see the official install guide at https://github.com/anchore/grype#installation
     """
     try:
         logger.info(f"Starting Grype directory scan: {directory_path}")
@@ -3142,7 +3176,7 @@ async def scan_directory_with_grype(
                 'error': f"Grype is not available: {grype_check.get('error', 'Unknown error')}",
                 'installation_instructions': {
                     'macos': 'brew install grype',
-                    'linux': 'curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh',
+                    'linux': 'See https://github.com/anchore/grype#installation; download a pinned release from https://github.com/anchore/grype/releases',
                     'windows': 'Download from https://github.com/anchore/grype/releases'
                 }
             }
@@ -3686,7 +3720,7 @@ async def scan_directory_with_syft(
     Note:
         Syft must be installed and available in PATH. Install with:
         - macOS: brew install syft
-        - Linux: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh
+        - Linux: see the official install guide at https://github.com/anchore/syft#installation
     """
     try:
         logger.info(f"Starting Syft directory scan: {directory_path}")
@@ -3699,7 +3733,7 @@ async def scan_directory_with_syft(
                 'error': f"Syft is not available: {syft_check.get('error', 'Unknown error')}",
                 'installation_instructions': {
                     'macos': 'brew install syft',
-                    'linux': 'curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh',
+                    'linux': 'See https://github.com/anchore/syft#installation; download a pinned release from https://github.com/anchore/syft/releases',
                     'windows': 'Download from https://github.com/anchore/syft/releases'
                 }
             }
