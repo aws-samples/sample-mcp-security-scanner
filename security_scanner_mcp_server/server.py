@@ -87,20 +87,20 @@ def handle_exceptions(func):
 # Hardened subprocess execution
 #
 # This server exists to invoke external security scanners, so calling other
-# programs is unavoidable. Every invocation goes through _run_tool(), which
-# guarantees that:
-#   * the command is always a list of strings run with shell=False, so no shell
-#     interprets the arguments and shell metacharacters have no meaning;
-#   * the program being run is on an explicit allowlist and is resolved to an
-#     absolute path before execution, so scanned content can never choose which
-#     binary runs;
+# programs is unavoidable. Every subprocess call in this module follows the
+# same rules:
+#   * the command is a list literal whose first element is a fixed tool name,
+#     run with shell=False, so no shell interprets the arguments;
+#   * the program is on an explicit allowlist and is resolved to an absolute
+#     path by _tool_path() and passed as `executable`, so scanned content can
+#     never choose which binary runs;
 #   * user-supplied values (directory paths, image names) are validated and
-#     normalised by the helpers below before they ever reach an argument list.
+#     normalised by the helpers below before they reach an argument list.
 # ---------------------------------------------------------------------------
 
 # Security tools this server is permitted to execute.
 _ALLOWED_EXECUTABLES = frozenset(
-    {'checkov', 'semgrep', 'bandit', 'trivy', 'syft', 'grype'}
+    {'checkov', 'semgrep', 'bandit', 'trivy', 'syft', 'grype', 'ash'}
 )
 
 # Conservative container image reference pattern, e.g.
@@ -115,46 +115,22 @@ _SYFT_OUTPUT_FORMATS = frozenset(
 )
 
 
-def _resolve_executable(name: str) -> str:
-    """Resolve an allowlisted tool name to an absolute path, or raise."""
-    if name == sys.executable:
-        # Running our own Python interpreter (used to isolate ASH).
-        return name
+def _tool_path(name: str) -> str:
+    """Resolve an allowlisted tool name to an absolute path, or raise.
+
+    Tools installed in the same environment as this server (for example ASH
+    when running under uvx) are looked up next to the running interpreter
+    first, then on PATH.
+    """
     if name not in _ALLOWED_EXECUTABLES:
         raise ValueError(f"Executable '{name}' is not allowed")
+    local = Path(sys.executable).parent / name
+    if local.is_file() and os.access(local, os.X_OK):
+        return str(local)
     resolved = shutil.which(name)
     if not resolved:
         raise FileNotFoundError(f"Required tool '{name}' was not found in PATH")
     return resolved
-
-
-def _run_tool(cmd: List[str], timeout: Optional[int] = None) -> subprocess.CompletedProcess:
-    """Run an allowlisted security tool with a fixed argument vector.
-
-    Centralising every subprocess call here keeps the security controls in a
-    single reviewed place: the command must be a list of strings, the
-    executable must be on the allowlist and is resolved to an absolute path, and
-    the shell is never used. This removes any command-injection path even though
-    the server's job is to run external scanners.
-    """
-    if not isinstance(cmd, list) or not cmd:
-        raise ValueError('Command must be a non-empty list of arguments')
-    if not all(isinstance(arg, str) for arg in cmd):
-        raise ValueError('All command arguments must be strings')
-
-    resolved_cmd = [_resolve_executable(cmd[0]), *cmd[1:]]
-
-    # Safe by construction: the executable is allowlisted and resolved to an
-    # absolute path above, shell=False, and the arguments are a fixed list (not
-    # a shell string), so scanned content cannot influence the command. This is
-    # the single audited subprocess call site for the whole server.
-    return subprocess.run(  # nosec B603 B607  # nosemgrep
-        resolved_cmd,
-        shell=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
 
 
 def _validate_directory_path(directory_path: str) -> str:
@@ -296,10 +272,21 @@ class SecurityScanner:
                     f.write(code)
 
                 # Run checkov via command line for better compatibility
-                cmd = ["checkov", "-f", file_path, "--output", "json", "--quiet"]
-                logger.info(f"Running command: {' '.join(cmd)}")
-                
-                result = _run_tool(cmd)
+                logger.info("Running checkov")
+                result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                    [
+                        "checkov",
+                        "-f",
+                        file_path,
+                        "--output",
+                        "json",
+                        "--quiet",
+                    ],
+                    executable=_tool_path('checkov'),
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                )
 
                 logger.info(f"Checkov exit code: {result.returncode}")
                 logger.info(f"Checkov stdout length: {len(result.stdout) if result.stdout else 0}")
@@ -365,17 +352,22 @@ class SecurityScanner:
                     f.write(code)
 
                 # Run semgrep with security rules
-                cmd = [
-                    "semgrep", 
-                    "--config=auto",
-                    "--config=p/security-audit",
-                    "--config=p/secrets",
-                    "--json", 
-                    "--quiet", 
-                    file_path
-                ]
-                
-                result = _run_tool(cmd)
+                logger.info("Running semgrep")
+                result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                    [
+                        "semgrep",
+                        "--config=auto",
+                        "--config=p/security-audit",
+                        "--config=p/secrets",
+                        "--json",
+                        "--quiet",
+                        file_path,
+                    ],
+                    executable=_tool_path('semgrep'),
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                )
 
                 if result.stdout:
                     try:
@@ -418,8 +410,19 @@ class SecurityScanner:
                     f.write(code)
 
                 # Run bandit with JSON output
-                cmd = ["bandit", "-f", "json", file_path]
-                result = _run_tool(cmd)
+                logger.info("Running bandit")
+                result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                    [
+                        "bandit",
+                        "-f",
+                        "json",
+                        file_path,
+                    ],
+                    executable=_tool_path('bandit'),
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                )
 
                 if result.stdout:
                     try:
@@ -812,7 +815,14 @@ class SecurityScanner:
     def check_syft_installation(self) -> Dict[str, Any]:
         """Check if Syft is installed and available."""
         try:
-            result = _run_tool(['syft', 'version'], timeout=10)
+            result = subprocess.run(  # nosec B603 B607 - fixed program and arguments, shell=False
+                ['syft', 'version'],
+                executable=_tool_path('syft'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             
             if result.returncode == 0:
                 # Parse version from output
@@ -847,7 +857,14 @@ class SecurityScanner:
     def check_grype_installation(self) -> Dict[str, Any]:
         """Check if Grype is installed and available."""
         try:
-            result = _run_tool(['grype', 'version'], timeout=10)
+            result = subprocess.run(  # nosec B603 B607 - fixed program and arguments, shell=False
+                ['grype', 'version'],
+                executable=_tool_path('grype'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             
             if result.returncode == 0:
                 # Parse version from output
@@ -882,7 +899,14 @@ class SecurityScanner:
     def check_trivy_installation(self) -> Dict[str, Any]:
         """Check if Trivy is installed and available."""
         try:
-            result = _run_tool(['trivy', '--version'], timeout=10)
+            result = subprocess.run(  # nosec B603 B607 - fixed program and arguments, shell=False
+                ['trivy', '--version'],
+                executable=_tool_path('trivy'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             
             if result.returncode == 0:
                 # Parse version from output (format: "Version: X.Y.Z")
@@ -917,7 +941,14 @@ class SecurityScanner:
     def check_bandit_installation(self) -> Dict[str, Any]:
         """Check if Bandit is installed and available."""
         try:
-            result = _run_tool(['bandit', '--version'], timeout=10)
+            result = subprocess.run(  # nosec B603 B607 - fixed program and arguments, shell=False
+                ['bandit', '--version'],
+                executable=_tool_path('bandit'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             
             if result.returncode == 0:
                 # Parse version from output
@@ -952,7 +983,14 @@ class SecurityScanner:
     def check_semgrep_installation(self) -> Dict[str, Any]:
         """Check if Semgrep is installed and available."""
         try:
-            result = _run_tool(['semgrep', '--version'], timeout=10)
+            result = subprocess.run(  # nosec B603 B607 - fixed program and arguments, shell=False
+                ['semgrep', '--version'],
+                executable=_tool_path('semgrep'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             
             if result.returncode == 0:
                 # Parse version from output
@@ -987,7 +1025,14 @@ class SecurityScanner:
     def check_checkov_installation(self) -> Dict[str, Any]:
         """Check if Checkov is installed and available."""
         try:
-            result = _run_tool(['checkov', '--version'], timeout=10)
+            result = subprocess.run(  # nosec B603 B607 - fixed program and arguments, shell=False
+                ['checkov', '--version'],
+                executable=_tool_path('checkov'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             
             if result.returncode == 0:
                 # Parse version from output
@@ -1042,17 +1087,22 @@ class SecurityScanner:
                 logger.info(f"Created temporary file: {file_path}")
                 
                 # Run Trivy with JSON output
-                cmd = [
-                    'trivy',
-                    'config',
-                    '--format', 'json',
-                    '--quiet',
-                    str(file_path)
-                ]
-                
-                logger.info(f"Running command: {' '.join(cmd)}")
-                
-                result = _run_tool(cmd, timeout=120)  # 2 minutes timeout
+                logger.info("Running trivy")
+                result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                    [
+                        'trivy',
+                        'config',
+                        '--format',
+                        'json',
+                        '--quiet',
+                        str(file_path),
+                    ],
+                    executable=_tool_path('trivy'),
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,  # 2 minutes timeout
+                )
                 
                 # Trivy returns non-zero when issues are found, which is expected
                 logger.info(f"Trivy exit code: {result.returncode}")
@@ -1107,17 +1157,22 @@ class SecurityScanner:
         try:
             image_name = _validate_image_name(image_name)
             # Run Trivy with JSON output
-            cmd = [
-                'trivy',
-                'image',
-                '--format', 'json',
-                '--quiet',
-                image_name
-            ]
-            
-            logger.info(f"Running command: {' '.join(cmd)}")
-            
-            result = _run_tool(cmd, timeout=600)  # 10 minutes timeout for image download
+            logger.info("Running trivy")
+            result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                [
+                    'trivy',
+                    'image',
+                    '--format',
+                    'json',
+                    '--quiet',
+                    image_name,
+                ],
+                executable=_tool_path('trivy'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=600,  # 10 minutes timeout for image download
+            )
             
             # Trivy returns non-zero when issues are found, which is expected
             logger.info(f"Trivy exit code: {result.returncode}")
@@ -1407,16 +1462,22 @@ class SecurityScanner:
         try:
             directory_path = _validate_directory_path(directory_path)
             # Run Bandit with JSON output
-            cmd = [
-                'bandit',
-                '-r', directory_path,
-                '-f', 'json',
-                '--quiet'
-            ]
-            
-            logger.info(f"Running command: {' '.join(cmd)}")
-            
-            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
+            logger.info("Running bandit")
+            result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                [
+                    'bandit',
+                    '-r',
+                    directory_path,
+                    '-f',
+                    'json',
+                    '--quiet',
+                ],
+                executable=_tool_path('bandit'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minutes timeout
+            )
             
             # Bandit returns non-zero when issues are found, which is expected
             logger.info(f"Bandit exit code: {result.returncode}")
@@ -1608,19 +1669,23 @@ class SecurityScanner:
         try:
             directory_path = _validate_directory_path(directory_path)
             # Run Semgrep with JSON output
-            cmd = [
-                'semgrep',
-                '--config=auto',
-                '--config=p/security-audit',
-                '--config=p/secrets',
-                '--json',
-                '--quiet',
-                directory_path
-            ]
-            
-            logger.info(f"Running command: {' '.join(cmd)}")
-            
-            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
+            logger.info("Running semgrep")
+            result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                [
+                    'semgrep',
+                    '--config=auto',
+                    '--config=p/security-audit',
+                    '--config=p/secrets',
+                    '--json',
+                    '--quiet',
+                    directory_path,
+                ],
+                executable=_tool_path('semgrep'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minutes timeout
+            )
             
             # Semgrep returns non-zero when issues are found, which is expected
             logger.info(f"Semgrep exit code: {result.returncode}")
@@ -1836,28 +1901,26 @@ class SecurityScanner:
             logger.info(f"ASH output directory: {output_dir}")
             logger.info(f"Running ASH scan with severity threshold: {severity_threshold}")
             
-            # Run ASH in a subprocess to isolate its threads/atexit handlers
-            # which would otherwise block the MCP event loop from returning.
-            ash_runner = f"""
-import sys
-from automated_security_helper.core.enums import AshLogLevel, RunMode
-from automated_security_helper.interactions.run_ash_scan import run_ash_scan
-try:
-    run_ash_scan(
-        source_dir={directory_path!r},
-        output_dir={str(output_dir)!r},
-        config=None,
-        mode=RunMode.local,
-        log_level=AshLogLevel.ERROR,
-        fail_on_findings=False,
-        show_summary=False,
-        exclude_scanners=['semgrep'],
-    )
-except Exception as e:
-    print(f'ASH error: {{e}}', file=sys.stderr)
-sys.exit(0)
-"""
-            ash_proc = _run_tool([sys.executable, '-c', ash_runner], timeout=300)
+            # Run the ASH CLI in a separate process to isolate its threads and
+            # atexit handlers, which would otherwise block the MCP event loop.
+            ash_proc = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                [
+                    'ash', 'scan',
+                    '--source-dir', directory_path,
+                    '--output-dir', str(output_dir),
+                    '--mode', 'local',
+                    '--log-level', 'ERROR',
+                    '--no-fail-on-findings',
+                    '--no-show-summary',
+                    '--no-progress',
+                    '--exclude-scanners', 'semgrep',
+                ],
+                executable=_tool_path('ash'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
             
             if ash_proc.returncode != 0:
                 logger.warning(f"ASH subprocess stderr: {ash_proc.stderr[:500]}")
@@ -1998,18 +2061,25 @@ sys.exit(0)
             directory_path = _validate_directory_path(directory_path)
             # Run Checkov with JSON output
             # Skip secrets framework to avoid detect-secrets dependency conflict
-            cmd = [
-                'checkov',
-                '-d', directory_path,
-                '-o', 'json',
-                '--quiet',
-                '--compact',
-                '--skip-framework', 'secrets'
-            ]
-            
-            logger.info(f"Running command: {' '.join(cmd)}")
-            
-            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
+            logger.info("Running checkov")
+            result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                [
+                    'checkov',
+                    '-d',
+                    directory_path,
+                    '-o',
+                    'json',
+                    '--quiet',
+                    '--compact',
+                    '--skip-framework',
+                    'secrets',
+                ],
+                executable=_tool_path('checkov'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minutes timeout
+            )
             
             # Checkov exit codes: 0 = no issues, 1 = issues found, 2 = error
             logger.info(f"Checkov exit code: {result.returncode}")
@@ -2253,16 +2323,21 @@ sys.exit(0)
                 )
 
             # Run Syft with JSON output
-            cmd = [
-                'syft',
-                f'dir:{directory_path}',
-                '-o', output_format,
-                '--quiet'
-            ]
-            
-            logger.info(f"Running command: {' '.join(cmd)}")
-            
-            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
+            logger.info("Running syft")
+            result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                [
+                    'syft',
+                    f'dir:{directory_path}',
+                    '-o',
+                    output_format,
+                    '--quiet',
+                ],
+                executable=_tool_path('syft'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minutes timeout
+            )
             
             if result.returncode != 0:
                 logger.error(f"Syft command failed with return code {result.returncode}")
@@ -2498,16 +2573,21 @@ sys.exit(0)
         try:
             directory_path = _validate_directory_path(directory_path)
             # Run Grype with JSON output
-            cmd = [
-                'grype',
-                f'dir:{directory_path}',
-                '-o', 'json',
-                '--quiet'
-            ]
-            
-            logger.info(f"Running command: {' '.join(cmd)}")
-            
-            result = _run_tool(cmd, timeout=300)  # 5 minutes timeout
+            logger.info("Running grype")
+            result = subprocess.run(  # nosec B603 B607 - fixed program, argument list, shell=False
+                [
+                    'grype',
+                    f'dir:{directory_path}',
+                    '-o',
+                    'json',
+                    '--quiet',
+                ],
+                executable=_tool_path('grype'),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minutes timeout
+            )
             
             if result.returncode not in [0, 1]:  # Grype returns 1 when vulnerabilities are found
                 logger.error(f"Grype command failed with return code {result.returncode}")
